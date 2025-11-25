@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+@config "../tailwind.config.js";
+
+p {
+    font-size: 13px;
+    color: #303030;
+}
+.offline-widget:before {
+    background: #ff5757;
+    width: 8px;
+    height: 8px;
+    left: 4px;
+    border-radius: 100px;
+}
+
+.offline-widget:after {
+    border: 2px solid #ff5757;
+    width: 16px;
+    height: 16px;
+    border-radius: 100px;
+    left: 0;
+}
+
+.offline-widget:after, .offline-widget:before {
+    position: absolute;
+    content: "";
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.online-widget:before {
+    background: #047b5d;
+    width: 8px;
+    height: 8px;
+    left: 4px;
+    border-radius: 100px;
+}
+
+.online-widget:after {
+    border: 2px solid #047b5d;
+    width: 16px;
+    height: 16px;
+    border-radius: 100px;
+    left: 0;
+}
+
+.online-widget:after, .online-widget:before {
+    position: absolute;
+    content: "";
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.custom-btn {
+    background: #3f3f3f;
+    box-shadow: inset 0 1px 0 0 #000,inset 0 0 0 1px #000,inset -2px 0 0 0 hsla(0,0%,100%,.2),inset 2px 0 0 0 hsla(0,0%,100%,.2),inset 1px 2px 0 0 hsla(0,0%,100%,.2);
+    font-size: 12px;
+    min-width: auto;
+}
+
+.danger-btn {
+    background: #c70a24;
+    box-shadow: 0px -1.5px 0px rgba(0, 0, 0, 0.25) inset, 1px 0px 0px rgba(255, 255, 255, 0.2) inset, -1px 0px 0px rgba(255, 255, 255, 0.2) inset, 0px 1px 0px rgba(255, 255, 255, 0.48) inset;
+    font-size: 12px;
+    min-width: auto;
+}
+
+.custom-btn {
+    border-radius: 8px;
+    height: 28px;
+    color: #fff;
+    padding: 5px 12px;
+    font-weight: 500;
+}
+
+.card {
+    background-color: #fff;
+    border-radius: 12px;
+    text-decoration: none;
+    padding: 16px;
+    box-shadow: 0.0625rem 0rem 0rem 0rem rgba(0,0,0,.13) inset,-0.0625rem 0rem 0rem 0rem rgba(0,0,0,.13) inset,0rem -0.0625rem 0rem 0rem rgba(0,0,0,.17) inset,0rem 0.0625rem 0rem 0rem hsla(0,0%,80%,.5) inset;
+}
+
+.card.default-card {
+    background: #F7F7F7;
+    box-shadow: 0.0625rem 0rem 0rem 0rem rgba(0,0,0,.13) inset,-0.0625rem 0rem 0rem 0rem rgba(0,0,0,.13) inset,0rem -0.0625rem 0rem 0rem rgba(0,0,0,.17) inset,0rem 0.0625rem 0rem 0rem hsla(0,0%,80%,.5) inset;
+}
