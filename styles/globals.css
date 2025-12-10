@@ -3,9 +3,10 @@
 @config "../tailwind.config.js";
 
 p {
-    font-size: 13px;
-    color: #303030;
+    font-size: 12px;
+    color: #616161;
 }
+
 .offline-widget:before {
     background: #ff5757;
     width: 8px;
@@ -22,7 +23,8 @@ p {
     left: 0;
 }
 
-.offline-widget:after, .offline-widget:before {
+.offline-widget:after,
+.offline-widget:before {
     position: absolute;
     content: "";
     top: 50%;
@@ -45,7 +47,8 @@ p {
     left: 0;
 }
 
-.online-widget:after, .online-widget:before {
+.online-widget:after,
+.online-widget:before {
     position: absolute;
     content: "";
     top: 50%;
@@ -54,7 +57,7 @@ p {
 
 .custom-btn {
     background: #3f3f3f;
-    box-shadow: inset 0 1px 0 0 #000,inset 0 0 0 1px #000,inset -2px 0 0 0 hsla(0,0%,100%,.2),inset 2px 0 0 0 hsla(0,0%,100%,.2),inset 1px 2px 0 0 hsla(0,0%,100%,.2);
+    box-shadow: inset 0 1px 0 0 #000, inset 0 0 0 1px #000, inset -2px 0 0 0 hsla(0, 0%, 100%, .2), inset 2px 0 0 0 hsla(0, 0%, 100%, .2), inset 1px 2px 0 0 hsla(0, 0%, 100%, .2);
     font-size: 12px;
     min-width: auto;
 }
@@ -74,15 +77,92 @@ p {
     font-weight: 500;
 }
 
+.custom-btn-default {
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: inset 0 -.0625rem 0 0 #b5b5b5,inset 0 0 0 .0625rem rgba(0,0,0,.1),inset 0 .03125rem 0 .09375rem #fff;
+    height: 28px;
+    padding: 4px 12px;
+    font-weight: 500;
+    font-size: 12px;
+    color: #303030;
+}
+
+.custom-btn-default:hover {
+    background: #fafafa;
+}
+
 .card {
     background-color: #fff;
     border-radius: 12px;
     text-decoration: none;
     padding: 16px;
-    box-shadow: 0.0625rem 0rem 0rem 0rem rgba(0,0,0,.13) inset,-0.0625rem 0rem 0rem 0rem rgba(0,0,0,.13) inset,0rem -0.0625rem 0rem 0rem rgba(0,0,0,.17) inset,0rem 0.0625rem 0rem 0rem hsla(0,0%,80%,.5) inset;
+    box-shadow: 0.0625rem 0rem 0rem 0rem rgba(0, 0, 0, .13) inset, -0.0625rem 0rem 0rem 0rem rgba(0, 0, 0, .13) inset, 0rem -0.0625rem 0rem 0rem rgba(0, 0, 0, .17) inset, 0rem 0.0625rem 0rem 0rem hsla(0, 0%, 80%, .5) inset;
+}
+
+.card {
+    padding: 16px;
+    box-shadow: 0 .0625rem 0 0 rgba(26, 26, 26, .07);
+    border-radius: 12px;
+    position: relative;
+    background: #fff;
+}
+
+.card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 32px;
+    box-shadow: 0.0625rem 0rem 0rem 0rem rgba(0, 0, 0, 0.13) inset, -0.0625rem 0rem 0rem 0rem rgba(0, 0, 0, 0.13) inset, 0rem -0.0625rem 0rem 0rem rgba(0, 0, 0, 0.17) inset, 0rem 0.0625rem 0rem 0rem rgba(204, 204, 204, 0.5) inset;
+    border-radius: 12px;
+    pointer-events: none;
+    mix-blend-mode: luminosity;
+}
+
+.flat-card::before {
+    border-radius: 0;
 }
 
 .card.default-card {
     background: #F7F7F7;
-    box-shadow: 0.0625rem 0rem 0rem 0rem rgba(0,0,0,.13) inset,-0.0625rem 0rem 0rem 0rem rgba(0,0,0,.13) inset,0rem -0.0625rem 0rem 0rem rgba(0,0,0,.17) inset,0rem 0.0625rem 0rem 0rem hsla(0,0%,80%,.5) inset;
+    box-shadow: 0.0625rem 0rem 0rem 0rem rgba(0, 0, 0, .13) inset, -0.0625rem 0rem 0rem 0rem rgba(0, 0, 0, .13) inset, 0rem -0.0625rem 0rem 0rem rgba(0, 0, 0, .17) inset, 0rem 0.0625rem 0rem 0rem hsla(0, 0%, 80%, .5) inset;
 }
+
+.custom-dropi select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    position: relative;
+    background: #FDFDFD;
+    border: 1px solid #8a8a8a;
+    border-radius: 8px;
+    font-size: 13px;
+    padding: 6px 8px 6px 12px;
+}
+
+.custom-dropi select:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.custom-dropi:before {
+    position: absolute;
+    content: "";
+    background: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") no-repeat right 0.75rem center / 16px;
+    pointer-events: none;
+    right: 1rem;
+    top: 50%;
+    background-position: center;
+    transform: translateY(50%);
+    width: 1em;
+    height: 1em;
+    color: #616161;
+    z-index: 10;
+}
+
+.tierTable thead tr[aria-hidden="true"] {
+    display: none !important;
+  }
