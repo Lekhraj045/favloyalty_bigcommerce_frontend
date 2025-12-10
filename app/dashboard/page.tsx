@@ -1,7 +1,7 @@
 import { Button } from "@heroui/button";
-import WhyWidgetDisable from "./components/why-widget-disbale";
-import SetupBar from "./components/setup-bar";
 import DashLayout from "./components/dash-layout";
+import SetupBar from "./components/setup-bar";
+import WhyWidgetDisable from "./components/why-widget-disbale";
 
 export default function DashboardPage() {
   return (
