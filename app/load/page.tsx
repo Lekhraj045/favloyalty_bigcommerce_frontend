@@ -23,15 +23,27 @@ function LoadPageContent() {
         const data: LoginResponse = await loginWithSignedPayload(
           signedPayload
         );
-        const { store, sessionToken } = data;
+        const { store, sessionToken, channels } = data;
 
+        // Store store information
+        localStorage.setItem("bc_store_id", store.id);
         localStorage.setItem("bc_store_hash", store.hash);
-        localStorage.setItem("bc_user_email", store.userEmail);
+        localStorage.setItem(
+          "bc_user_email",
+          store.userEmail || store.email || ""
+        );
         localStorage.setItem("bc_session_token", sessionToken);
         localStorage.setItem(
           "bc_session_expires_at",
           data.sessionExpiresAt.toString()
         );
+
+        // Store channels array
+        if (channels && channels.length > 0) {
+          localStorage.setItem("bc_channels", JSON.stringify(channels));
+        } else {
+          localStorage.setItem("bc_channels", JSON.stringify([]));
+        }
 
         // Redirect to dashboard
         router.push(`/dashboard?storeHash=${store.hash}`);
