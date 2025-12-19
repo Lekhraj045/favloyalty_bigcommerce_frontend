@@ -1,3 +1,4 @@
+import ChannelSelector from "@/components/ChannelSelector";
 import { Button } from "@heroui/button";
 import { CircleCheck, Scan } from "lucide-react";
 import PointsSetting from "./setup/points-tier-system/PointsSetting";
@@ -15,6 +16,7 @@ export default function Home() {
               </div>
 
               <div className="flex gap-2.5 items-center">
+                <ChannelSelector />
                 <div className="relative">
                   {(() => {
                     // Dynamic progress calculation

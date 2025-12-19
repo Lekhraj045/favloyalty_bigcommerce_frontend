@@ -15,16 +15,16 @@ const getAuthToken = (): string | null => {
 const getAuthHeaders = (includeContentType = false): HeadersInit => {
   const headers: HeadersInit = {};
   const token = getAuthToken();
-  
+
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  
+
   // Note: Don't set Content-Type for FormData - browser will set it automatically with boundary
   if (includeContentType) {
     headers["Content-Type"] = "application/json";
   }
-  
+
   return headers;
 };
 
@@ -32,6 +32,43 @@ export async function getStoreInfo(storeHash: string) {
   const response = await fetch(`${API_URL}/api/store/${storeHash}`);
   if (!response.ok) throw new Error("Failed to fetch store");
   return response.json();
+}
+
+// Helper function to get store ID from localStorage
+export function getStoreId(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("bc_store_id");
+}
+
+// Fetch channels for a store
+export async function getChannels(storeId: string): Promise<Channel[]> {
+  console.log("📥 Fetching channels for store:", storeId);
+
+  const response = await fetch(`${API_URL}/api/channels?storeId=${storeId}`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error fetching channels:", errorBody);
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to fetch channels"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Channels fetched successfully:", result);
+
+  // Handle both array response and object with channels property
+  if (Array.isArray(result)) {
+    return result;
+  } else if (result.channels && Array.isArray(result.channels)) {
+    return result.channels;
+  } else if (result.data && Array.isArray(result.data)) {
+    return result.data;
+  }
+
+  return [];
 }
 
 export type Channel = {
@@ -173,7 +210,9 @@ export async function savePoints(
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error saving points:", errorBody);
-    throw new Error(errorBody.message || errorBody.error || "Failed to save points");
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to save points"
+    );
   }
 
   const result = await response.json();
@@ -230,7 +269,9 @@ export async function updatePoints(
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error updating points:", errorBody);
-    throw new Error(errorBody.message || errorBody.error || "Failed to update points");
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to update points"
+    );
   }
 
   const result = await response.json();

@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@heroui/table";
 import { SquarePen, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface TierTableProps {
   tiers: Tier[];
@@ -21,6 +21,7 @@ interface TierTableProps {
     pointRequired?: string;
     multiplier?: string;
   };
+  resetEditing?: boolean;
 }
 
 export default function TierTable({
@@ -28,8 +29,32 @@ export default function TierTable({
   isEditMode = false,
   onTierUpdate,
   validationErrors,
+  resetEditing = false,
 }: TierTableProps) {
   const [editing, setEditing] = useState<boolean>(false);
+  // Track input strings for multipliers to allow smooth decimal typing
+  const [multiplierInputs, setMultiplierInputs] = useState<Record<number, string>>({});
+
+  // Reset editing state when resetEditing prop changes to true
+  useEffect(() => {
+    if (resetEditing && editing) {
+      setEditing(false);
+      setMultiplierInputs({}); // Clear input strings when resetting
+    }
+  }, [resetEditing, editing]);
+
+  // Initialize multiplier inputs when editing starts or tiers change
+  useEffect(() => {
+    if (editing) {
+      const inputs: Record<number, string> = {};
+      tiers.forEach((tier, index) => {
+        if (tier.multiplier !== undefined && tier.multiplier !== null) {
+          inputs[index] = tier.multiplier.toString();
+        }
+      });
+      setMultiplierInputs(inputs);
+    }
+  }, [editing, tiers.length]);
 
   const handleEdit = () => {
     setEditing(!editing);
@@ -47,26 +72,57 @@ export default function TierTable({
   };
 
   const handleMultiplierChange = (index: number, value: string) => {
-    // Allow decimal format: 9.99
+    // Remove all non-numeric and non-decimal characters
     let sanitized = value.replace(/[^0-9.]/g, "");
 
-    // Ensure only one decimal point
-    const decimalIndex = sanitized.indexOf(".");
-    if (decimalIndex !== -1) {
-      const beforeDecimal = sanitized.substring(0, decimalIndex);
-      const afterDecimal = sanitized
-        .substring(decimalIndex + 1)
-        .replace(/\./g, "");
-      const limitedBefore =
-        beforeDecimal.length > 0 ? beforeDecimal.substring(0, 1) : "0";
-      const limitedAfter = afterDecimal.substring(0, 2);
-      sanitized = limitedBefore + "." + limitedAfter;
-    } else if (sanitized.length > 0) {
-      sanitized = sanitized.substring(0, 1);
+    // Handle empty input
+    if (sanitized === "" || sanitized === ".") {
+      // Keep the input string but don't update the multiplier yet
+      setMultiplierInputs((prev) => ({
+        ...prev,
+        [index]: sanitized,
+      }));
+      return;
     }
 
-    const numValue = sanitized === "" ? 0 : parseFloat(sanitized);
-    onTierUpdate?.(index, "multiplier", numValue);
+    // Ensure only one decimal point - keep the first one
+    const firstDecimalIndex = sanitized.indexOf(".");
+    if (firstDecimalIndex !== -1) {
+      const beforeDecimal = sanitized.substring(0, firstDecimalIndex);
+      const afterDecimal = sanitized.substring(firstDecimalIndex + 1).replace(/\./g, "");
+      // Limit to 2 decimal places
+      sanitized = beforeDecimal + "." + afterDecimal.substring(0, 2);
+    }
+
+    // Check if the value exceeds 9.99 before parsing
+    const numValue = parseFloat(sanitized);
+    if (!isNaN(numValue)) {
+      // Enforce maximum value of 9.99
+      if (numValue > 9.99) {
+        sanitized = "9.99";
+        setMultiplierInputs((prev) => ({
+          ...prev,
+          [index]: "9.99",
+        }));
+        onTierUpdate?.(index, "multiplier", 9.99);
+        return;
+      }
+      
+      // Update the input string state
+      setMultiplierInputs((prev) => ({
+        ...prev,
+        [index]: sanitized,
+      }));
+      
+      // Update multiplier
+      onTierUpdate?.(index, "multiplier", numValue);
+    } else {
+      // Update input string even if not a valid number (for typing experience)
+      setMultiplierInputs((prev) => ({
+        ...prev,
+        [index]: sanitized,
+      }));
+    }
   };
 
   return (
@@ -105,7 +161,7 @@ export default function TierTable({
           <TableRow key="1">
             <TableCell className="pl-3">Tier Name</TableCell>
             {tiers.map((tier, index) => (
-              <TableCell key={index}>
+              <TableCell key={`tier-name-${index}`}>
                 {editing ? (
                   <input
                     type="text"
@@ -133,7 +189,7 @@ export default function TierTable({
           <TableRow key="2">
             <TableCell className="pl-3">Points Required</TableCell>
             {tiers.map((tier, index) => (
-              <TableCell key={index}>
+              <TableCell key={`points-required-${index}`}>
                 {editing ? (
                   <input
                     type="text"
@@ -164,14 +220,36 @@ export default function TierTable({
           <TableRow key="3">
             <TableCell className="pl-3">Point Multiplier</TableCell>
             {tiers.map((tier, index) => (
-              <TableCell key={index}>
+              <TableCell key={`multiplier-${index}`}>
                 {editing ? (
                   <input
                     type="text"
-                    value={tier.multiplier}
+                    value={multiplierInputs[index] !== undefined 
+                      ? multiplierInputs[index] 
+                      : (tier.multiplier === undefined || tier.multiplier === null 
+                          ? "" 
+                          : tier.multiplier.toString())}
                     onChange={(e) =>
                       handleMultiplierChange(index, e.target.value)
                     }
+                    onBlur={() => {
+                      // On blur, ensure the value is properly formatted and within limits
+                      const currentInput = multiplierInputs[index];
+                      if (currentInput && currentInput !== "") {
+                        let numValue = parseFloat(currentInput);
+                        if (!isNaN(numValue)) {
+                          // Enforce maximum value of 9.99
+                          if (numValue > 9.99) {
+                            numValue = 9.99;
+                          }
+                          onTierUpdate?.(index, "multiplier", numValue);
+                          setMultiplierInputs((prev) => ({
+                            ...prev,
+                            [index]: numValue.toString(),
+                          }));
+                        }
+                      }
+                    }}
                     disabled={index === 0}
                     className={`w-full border rounded px-2 py-1 text-xs ${
                       validationErrors?.multiplier &&

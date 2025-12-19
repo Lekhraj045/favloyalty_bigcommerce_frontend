@@ -1,13 +1,16 @@
 // app/load/page.js
 "use client";
 
+import { useAppDispatch } from "@/store/hooks";
+import { setChannels, setSelectedChannel } from "@/store/slices/channelSlice";
+import { loginWithSignedPayload, type LoginResponse } from "@/utils/api";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { loginWithSignedPayload, type LoginResponse } from "@/utils/api";
 
 function LoadPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -20,9 +23,7 @@ function LoadPageContent() {
       }
 
       try {
-        const data: LoginResponse = await loginWithSignedPayload(
-          signedPayload
-        );
+        const data: LoginResponse = await loginWithSignedPayload(signedPayload);
         const { store, sessionToken, channels } = data;
 
         // Store store information
@@ -38,11 +39,18 @@ function LoadPageContent() {
           data.sessionExpiresAt.toString()
         );
 
-        // Store channels array
+        // Store channels array in localStorage
         if (channels && channels.length > 0) {
           localStorage.setItem("bc_channels", JSON.stringify(channels));
+          // Dispatch channels to Redux store
+          dispatch(setChannels(channels));
+          // Select first channel by default
+          if (channels.length > 0) {
+            dispatch(setSelectedChannel(channels[0]));
+          }
         } else {
           localStorage.setItem("bc_channels", JSON.stringify([]));
+          dispatch(setChannels([]));
         }
 
         // Redirect to dashboard

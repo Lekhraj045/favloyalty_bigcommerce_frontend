@@ -1,3 +1,6 @@
+"use client";
+
+import ChannelSelector from "@/components/ChannelSelector";
 import { Button } from "@heroui/button";
 import DashLayout from "./components/dash-layout";
 import SetupBar from "./components/setup-bar";
@@ -15,6 +18,7 @@ export default function DashboardPage() {
               <div className="relative offline-widget pl-6">
                 <p className="font-bold">Loyalty program not active</p>
               </div>
+              <ChannelSelector />
               <Button className="custom-btn">Disable Widget</Button>
               <Button className="custom-btn danger-btn">Reset Settings</Button>
             </div>
