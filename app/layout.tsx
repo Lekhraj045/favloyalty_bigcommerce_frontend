@@ -24,7 +24,7 @@ export default function RootLayout({
         )}
       >
         <Providers>
-          <div className="relative flex flex-col h-screen">
+          <div className="relative flex flex-col h-full">
             <Navbar />
             <main className="flex-grow p-4">{children}</main>
           </div>
