@@ -308,3 +308,103 @@ export async function getPoints(
   console.log("✅ Points fetched successfully:", result);
   return result;
 }
+
+// Collect Settings Types
+export interface CollectSettingsData {
+  basic?: {
+    signup?: { active: boolean; point: number };
+    spent?: { active: boolean; point: number };
+    birthday?: { active: boolean; point: number };
+    subucribing?: { active: boolean; point: number };
+    profileComplition?: { active: boolean; point: number };
+  };
+  event?: {
+    events?: Array<{
+      name: string;
+      type: string;
+      eventDate: Date | string;
+      point: number;
+    }>;
+    active?: boolean;
+  };
+  referAndEarn?: {
+    active: boolean;
+    point: number;
+  };
+  socialMedia?: {
+    active: boolean;
+  };
+  goal?: {
+    active: boolean;
+  };
+  rejoin?: {
+    active: boolean;
+    dayOfRecall: number;
+    pointRejoin: number;
+  };
+  emailSetting?: any; // Can be expanded later
+}
+
+export async function saveCollectSettings(
+  storeId: string,
+  channelId: string,
+  settingsData: CollectSettingsData
+): Promise<{ success: boolean; message: string; data?: any }> {
+  console.log("📤 Saving collect settings:", {
+    storeId,
+    channelId,
+    settingsData,
+  });
+
+  const response = await fetch(`${API_URL}/api/collect-settings`, {
+    method: "POST",
+    headers: getAuthHeaders(true),
+    body: JSON.stringify({
+      storeId,
+      channelId,
+      ...settingsData,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error saving collect settings:", errorBody);
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to save collect settings"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Collect settings saved successfully:", result);
+  return result;
+}
+
+export async function getCollectSettings(
+  storeId: string,
+  channelId: string
+): Promise<CollectSettingsData | null> {
+  console.log("📥 Fetching collect settings:", { storeId, channelId });
+
+  const response = await fetch(
+    `${API_URL}/api/collect-settings?storeId=${storeId}&channelId=${channelId}`,
+    {
+      headers: getAuthHeaders(),
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      console.log("ℹ️ No collect settings found");
+      return null;
+    }
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error fetching collect settings:", errorBody);
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to fetch collect settings"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Collect settings fetched successfully:", result);
+  return result;
+}

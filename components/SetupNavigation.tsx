@@ -3,12 +3,20 @@
 import { useRouter, usePathname } from "next/navigation";
 import { CircleCheck, Scan } from "lucide-react";
 
-export default function SetupNavigation() {
+interface SetupNavigationProps {
+  onNavigate?: (route: string) => void;
+}
+
+export default function SetupNavigation({ onNavigate }: SetupNavigationProps) {
   const router = useRouter();
   const pathname = usePathname();
 
   const handleNavigation = (route: string) => {
-    router.push(route);
+    if (onNavigate) {
+      onNavigate(route);
+    } else {
+      router.push(route);
+    }
   };
 
   const steps = [

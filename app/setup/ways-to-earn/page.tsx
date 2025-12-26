@@ -1,343 +1,344 @@
 "use client";
 
-import React from "react";
-import SetupNavigation from "@/components/SetupNavigation";
 import SetupHeader from "@/components/SetupHeader";
-import { Switch } from "@heroui/switch";
-import { Tooltip } from "@heroui/tooltip";
+import SetupNavigation from "@/components/SetupNavigation";
+import { saveCollectSettings } from "@/utils/api";
 import { Button } from "@heroui/button";
-import { Info, Search } from "lucide-react";
-import { DatePicker } from "@heroui/date-picker";
-import { Input } from "@heroui/input";
-import EventsTable from "./eventsTable";
+import { addToast } from "@heroui/toast";
+import { useEffect, useMemo, useState } from "react";
+import LoadingSkeleton from "./components/LoadingSkeleton";
+import PointsOnEventsSection from "./components/PointsOnEventsSection";
+import PointsOnRejoiningSection from "./components/PointsOnRejoiningSection";
+import UnsavedChangesModal from "./components/UnsavedChangesModal";
+import WaysToEarnSection from "./components/WaysToEarnSection";
+import { useUnsavedChanges, useWaysToEarnSettings } from "./hooks";
+import type { Event } from "./types";
+import { createEventFromForm } from "./utils";
 
 export default function WaysToEarn() {
+  const settings = useWaysToEarnSettings();
+  const [savedEvents, setSavedEvents] = useState<Event[]>([]);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveAndNextLoading, setSaveAndNextLoading] = useState(false);
+
+  // Update savedEvents when events are loaded
+  useEffect(() => {
+    if (
+      settings.events.length > 0 &&
+      savedEvents.length === 0 &&
+      !settings.loading
+    ) {
+      setSavedEvents(JSON.parse(JSON.stringify(settings.events)));
+    }
+  }, [settings.events, settings.loading]);
+
+  // Filter events based on search query
+  const filteredEvents = useMemo(() => {
+    if (!settings.eventSearchQuery.trim()) {
+      return settings.events;
+    }
+    const query = settings.eventSearchQuery.toLowerCase();
+    return settings.events.filter(
+      (event) =>
+        event.name?.toLowerCase().includes(query) ||
+        event.eventDate?.toLowerCase().includes(query) ||
+        String(event.point)?.includes(query)
+    );
+  }, [settings.events, settings.eventSearchQuery]);
+
+  // Handle save
+  const handleSave = async (isNext: boolean = false) => {
+    if (!settings.storeId || !settings.channelId) {
+      addToast({
+        title: "Error",
+        description: "Store ID or Channel ID is missing",
+        color: "danger",
+      });
+      return;
+    }
+
+    // Validate that no enabled toggle has 0 points
+    const validationErrors: string[] = [];
+
+    if (
+      settings.signUp.enabled &&
+      (parseInt(settings.signUp.points) || 0) === 0
+    ) {
+      validationErrors.push("Sign up");
+    }
+    if (
+      settings.everyPurchase.enabled &&
+      (parseFloat(settings.everyPurchase.points) || 0) === 0
+    ) {
+      validationErrors.push("Every purchase (Per INR spent)");
+    }
+    if (
+      settings.birthday.enabled &&
+      (parseInt(settings.birthday.points) || 0) === 0
+    ) {
+      validationErrors.push("Birthday");
+    }
+    if (
+      settings.referEarn.enabled &&
+      (parseInt(settings.referEarn.points) || 0) === 0
+    ) {
+      validationErrors.push("Refer & Earn");
+    }
+    if (
+      settings.profileCompletion.enabled &&
+      (parseInt(settings.profileCompletion.points) || 0) === 0
+    ) {
+      validationErrors.push("Profile Completion");
+    }
+    if (
+      settings.newsletter.enabled &&
+      (parseInt(settings.newsletter.points) || 0) === 0
+    ) {
+      validationErrors.push("Subscribing to newsletter");
+    }
+    if (
+      settings.rejoin.enabled &&
+      (parseInt(settings.rejoin.points) || 0) === 0
+    ) {
+      validationErrors.push("Points on Rejoining");
+    }
+
+    if (validationErrors.length > 0) {
+      addToast({
+        title: "Validation Error",
+        description: `Please set points greater than 0 for the following enabled options: ${validationErrors.join(", ")}`,
+        color: "danger",
+      });
+      return;
+    }
+
+    const loadingSetter = isNext ? setSaveAndNextLoading : setSaveLoading;
+    loadingSetter(true);
+
+    try {
+      // Prepare basic settings
+      const basic = {
+        signup: {
+          active: settings.signUp.enabled,
+          point: parseInt(settings.signUp.points) || 0,
+        },
+        spent: {
+          active: settings.everyPurchase.enabled,
+          point: parseFloat(settings.everyPurchase.points) || 0,
+        },
+        birthday: {
+          active: settings.birthday.enabled,
+          point: parseInt(settings.birthday.points) || 0,
+        },
+        subucribing: {
+          active: settings.newsletter.enabled,
+          point: parseInt(settings.newsletter.points) || 0,
+        },
+        profileComplition: {
+          active: settings.profileCompletion.enabled,
+          point: parseInt(settings.profileCompletion.points) || 0,
+        },
+      };
+
+      // Prepare refer and earn settings
+      const referAndEarn = {
+        active: settings.referEarn.enabled,
+        point: parseInt(settings.referEarn.points) || 0,
+      };
+
+      // Prepare event settings
+      const event = {
+        active: settings.eventsEnabled,
+        events: settings.events || [],
+      };
+
+      // Prepare rejoin settings
+      const rejoin = {
+        active: settings.rejoin.enabled,
+        dayOfRecall: parseInt(settings.rejoin.recallDays) || 0,
+        pointRejoin: parseInt(settings.rejoin.points) || 0,
+      };
+
+      const settingsData = {
+        basic,
+        referAndEarn,
+        event,
+        rejoin,
+      };
+
+      const response = await saveCollectSettings(
+        settings.storeId,
+        settings.channelId,
+        settingsData
+      );
+
+      if (response && response.success) {
+        // Update saved events state after successful save
+        setSavedEvents(JSON.parse(JSON.stringify(settings.events)));
+        addToast({
+          title: "Success",
+          description: "Settings saved successfully",
+          color: "success",
+        });
+      } else {
+        throw new Error("Save operation did not return success");
+      }
+
+      if (isNext) {
+        console.log("Navigate to next page");
+      }
+    } catch (error: any) {
+      console.error("Error saving settings:", error);
+      addToast({
+        title: "Error",
+        description: error.message || "Failed to save settings",
+        color: "danger",
+      });
+    } finally {
+      loadingSetter(false);
+    }
+  };
+
+  // Unsaved changes hook
+  const unsavedChanges = useUnsavedChanges(
+    settings.events,
+    savedEvents,
+    handleSave,
+    () => {
+      // Reset events to saved state
+      settings.setEvents(JSON.parse(JSON.stringify(savedEvents)));
+    }
+  );
+
+  // Event handlers
+  const handleAddEvent = () => {
+    const newEvent = createEventFromForm(settings.eventFormData);
+    if (newEvent) {
+      settings.setEvents([...settings.events, newEvent]);
+      settings.setEventFormData({ name: "", date: null, points: "" });
+      addToast({
+        title: "Success",
+        description: "Event added successfully",
+        color: "success",
+      });
+    }
+  };
+
+  const handleDeleteEvent = (eventId: string | number, index: number) => {
+    const updatedEvents = settings.events.filter((_, i) => i !== index);
+    settings.setEvents(updatedEvents);
+    addToast({
+      title: "Success",
+      description: "Event deleted successfully",
+      color: "success",
+    });
+  };
+
+  const handleEditEvent = (event: Event, index: number) => {
+    // This is called when edit mode starts, but we don't need to do anything
+    // as the EventsTable handles the edit state internally
+  };
+
+  const handleSaveEvent = (index: number, updatedEvent: Event) => {
+    const updatedEvents = [...settings.events];
+    updatedEvents[index] = updatedEvent;
+    settings.setEvents(updatedEvents);
+    addToast({
+      title: "Success",
+      description: "Event updated successfully",
+      color: "success",
+    });
+  };
+
+  const handleCancelEvent = (index: number) => {
+    // Cancel is handled by EventsTable internally
+    // No need to do anything here
+  };
+
+  // Show skeleton loading state
+  if (settings.loading) {
+    return <LoadingSkeleton />;
+  }
+
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-col gap-4">
         <div className="head">
           <SetupHeader />
-          <SetupNavigation />
+          <SetupNavigation onNavigate={unsavedChanges.safeNavigate} />
         </div>
 
-        <div className="card !p-0">
-          <div className="flex flex-col gap-1 p-4 border-b border-[#DEDEDE]">
-            <h2 className="text-base font-bold">Ways to Earn</h2>
-            <p>Set ways to earn points.</p>
-          </div>
+        <WaysToEarnSection
+          signUp={settings.signUp}
+          everyPurchase={settings.everyPurchase}
+          birthday={settings.birthday}
+          referEarn={settings.referEarn}
+          profileCompletion={settings.profileCompletion}
+          newsletter={settings.newsletter}
+          onSignUpChange={(enabled, points) => {
+            // Always update enabled state first
+            settings.setSignUpEnabled(enabled);
+            // Then update points (will be "0" if disabled)
+            settings.setSignUpPoints(points);
+            // Mark as unsaved
+            unsavedChanges.setHasUnsavedChanges(true);
+          }}
+          onEveryPurchaseChange={(enabled, points) => {
+            settings.setEveryPurchaseEnabled(enabled);
+            settings.setEveryPurchasePoints(points);
+            unsavedChanges.setHasUnsavedChanges(true);
+          }}
+          onBirthdayChange={(enabled, points) => {
+            settings.setBirthdayEnabled(enabled);
+            settings.setBirthdayPoints(points);
+            unsavedChanges.setHasUnsavedChanges(true);
+          }}
+          onReferEarnChange={(enabled, points) => {
+            settings.setReferEarnEnabled(enabled);
+            settings.setReferEarnPoints(points);
+            unsavedChanges.setHasUnsavedChanges(true);
+          }}
+          onProfileCompletionChange={(enabled, points) => {
+            settings.setProfileCompletionEnabled(enabled);
+            settings.setProfileCompletionPoints(points);
+            unsavedChanges.setHasUnsavedChanges(true);
+          }}
+          onNewsletterChange={(enabled, points) => {
+            settings.setNewsletterEnabled(enabled);
+            settings.setNewsletterPoints(points);
+            unsavedChanges.setHasUnsavedChanges(true);
+          }}
+        />
 
-          <div className="grid grid-cols-2 gap-8 p-4">
-            <div className="flex justify-between items-center">
-              <h4 className="text-sm font-bold">Sign up</h4>
-              <div className="flex items-center gap-3">
-                <Switch aria-label="Sign up" size="sm" color="success" />
+        <PointsOnEventsSection
+          enabled={settings.eventsEnabled}
+          events={settings.events}
+          formData={settings.eventFormData}
+          searchQuery={settings.eventSearchQuery}
+          filteredEvents={filteredEvents}
+          onToggleChange={settings.setEventsEnabled}
+          onFormChange={(field, value) => {
+            settings.setEventFormData({
+              ...settings.eventFormData,
+              [field]: value,
+            });
+          }}
+          onAddEvent={handleAddEvent}
+          onEditEvent={handleEditEvent}
+          onSaveEvent={handleSaveEvent}
+          onCancelEvent={handleCancelEvent}
+          onDeleteEvent={handleDeleteEvent}
+          onSearchChange={settings.setEventSearchQuery}
+        />
 
-                <input
-                  type="text"
-                  className="w-[120px] h-8 border border-[#8a8a8a] rounded-lg px-3 text-[13px] leading-none focus:outline-none bg-[#fdfdfd]"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <h4 className="text-sm font-bold">
-                Every purchase (Per INR spent)
-              </h4>
-              <div className="flex items-center gap-3">
-                <Switch
-                  aria-label="Every purchase (Per INR spent)"
-                  size="sm"
-                  color="success"
-                />
-
-                <input
-                  type="text"
-                  className="w-[120px] h-8 border border-[#8a8a8a] rounded-lg px-3 text-[13px] leading-none focus:outline-none bg-[#fdfdfd]"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold">Birthday</h4>
-                <Tooltip
-                  content="Customers receive birthday points upon entering their birthdate via the widget. Once set, the birthdate cannot be modified for a period of 365 days to prevent potential misuse."
-                  showArrow={true}
-                  closeDelay={0}
-                  size="sm"
-                  classNames={{
-                    content: "max-w-xs whitespace-normal break-words",
-                  }}
-                >
-                  <Info width={16} height={16} />
-                </Tooltip>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Switch aria-label="Birthday" size="sm" color="success" />
-
-                <input
-                  type="text"
-                  className="w-[120px] h-8 border border-[#8a8a8a] rounded-lg px-3 text-[13px] leading-none focus:outline-none bg-[#fdfdfd]"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold">Refer & Earn</h4>
-                <Tooltip
-                  content="When a customer refers a friend: The friend gets points upon signing up, and customer will receive points after the friend makes their first purchase upon fullfillment of the order."
-                  showArrow={true}
-                  closeDelay={0}
-                  size="sm"
-                  classNames={{
-                    content: "max-w-xs whitespace-normal break-words",
-                  }}
-                >
-                  <Info width={16} height={16} />
-                </Tooltip>
-              </div>
-              <div className="flex items-center gap-3">
-                <Switch aria-label="Refer & Earn" size="sm" color="success" />
-
-                <input
-                  type="text"
-                  className="w-[120px] h-8 border border-[#8a8a8a] rounded-lg px-3 text-[13px] leading-none focus:outline-none bg-[#fdfdfd]"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <h4 className="text-sm font-bold">Profile Completion</h4>
-              <div className="flex items-center gap-3">
-                <Switch
-                  aria-label="Profile Completion"
-                  size="sm"
-                  color="success"
-                />
-
-                <input
-                  type="text"
-                  className="w-[120px] h-8 border border-[#8a8a8a] rounded-lg px-3 text-[13px] leading-none focus:outline-none bg-[#fdfdfd]"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <h4 className="text-sm font-bold">Subscribing to newsletter</h4>
-              <div className="flex items-center gap-3">
-                <Switch
-                  aria-label="Subscribing to newsletter"
-                  size="sm"
-                  color="success"
-                />
-
-                <input
-                  type="text"
-                  className="w-[120px] h-8 border border-[#8a8a8a] rounded-lg px-3 text-[13px] leading-none focus:outline-none bg-[#fdfdfd]"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="card !p-0">
-          <div className="flex justify-between items-center gap-6 p-4 border-b border-[#DEDEDE]">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-base font-bold">Points on Events</h2>
-              <p>
-                Configure special events where customers can earn loyalty
-                points. You can set up multiple events with their dates and
-                point values.
-              </p>
-            </div>
-            <Switch aria-label="Points on Events" size="sm" color="success" />
-          </div>
-
-          <div className="card !p-0 m-4">
-            <div className="flex justify-between items-center gap-4 p-4 border-b border-[#DEDEDE]">
-              <div className="flex flex-col gap-1">
-                <h2 className="text-sm font-bold">Add New Event</h2>
-                <p>
-                  Events allow you to award points for special occasions.
-                  Same-day events are processed immediately in the background.
-                </p>
-              </div>
-              <Button className="custom-btn">Add Event</Button>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 p-4">
-              <div>
-                <div className="w-full custom-dropi relative">
-                  <label className="block mb-1 text-[13px]">
-                    Select Name For Point
-                  </label>
-                  <select className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Select Event</option>
-                    <option value="Birthday">Birthday</option>
-                    <option value="Refer & Earn">Refer & Earn</option>
-                    <option value="Profile Completion">
-                      Profile Completion
-                    </option>
-                    <option value="Subscribing to newsletter">
-                      Subscribing to newsletter
-                    </option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="w-full">
-                <label className="block mb-1 text-[13px]">Date of Event</label>
-                <DatePicker
-                  showMonthAndYearPickers
-                  size="sm"
-                  classNames={{
-                    base: "w-full",
-                    inputWrapper: [
-                      "bg-[#fdfdfd]",
-                      "border",
-                      "border-[#8a8a8a]",
-                      "rounded-lg",
-                      "h-8",
-                      "px-3",
-                    ],
-                  }}
-                />
-              </div>
-
-              <div className="">
-                <label className="block mb-1 text-[13px]">
-                  Points (1-10000)
-                </label>
-                <input
-                  type="text"
-                  onKeyDown={(e) => {
-                    if (
-                      !/[0-9]/.test(e.key) &&
-                      e.key !== "Backspace" &&
-                      e.key !== "Delete" &&
-                      e.key !== "ArrowLeft" &&
-                      e.key !== "ArrowRight" &&
-                      e.key !== "Tab"
-                    ) {
-                      e.preventDefault();
-                    }
-                  }}
-                  className="w-full h-8 border border-[#8a8a8a] rounded-lg px-3 text-[13px] leading-none focus:outline-none bg-[#fdfdfd]"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="card !p-0 m-4">
-            <div className="flex justify-between items-center gap-4 p-4 border-b border-[#DEDEDE]">
-              <div className="flex flex-col gap-1">
-                <h2 className="text-sm font-bold">Scheduled Events</h2>
-                <p>View and manage scheduled events.</p>
-              </div>
-
-              <div className="h-8">
-                <Input
-                  variant="bordered"
-                  placeholder="you@example.com"
-                  startContent={
-                    <Search className="text-lg text-default-400 pointer-events-none shrink-0 w-4" />
-                  }
-                  type="email"
-                  classNames={{
-                    base: "w-full",
-                    inputWrapper: [
-                      "h-8",
-                      "min-h-8",
-                      "bg-[#fdfdfd]",
-                      "border",
-                      "border-[#8a8a8a]",
-                      "rounded-lg",
-                      "w-[200px]",
-                      "px-2",
-                    ].join(" "),
-                    input: ["text-xs"].join(" "),
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="p-4">
-              <EventsTable />
-            </div>
-          </div>
-        </div>
-
-        <div className="card !p-0">
-          <div className="flex justify-between items-center gap-4 p-4 border-b border-[#DEDEDE]">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-sm font-bold">Points on Rejoining</h2>
-              <p>
-                Recall period is the time for which customer has not visited the
-                website. You can award points as a reminder for the customer to
-                visit the website after this time has elapsed
-              </p>
-            </div>
-            <Switch
-              aria-label="Points on Rejoining"
-              size="sm"
-              color="success"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 p-4">
-            <div className="">
-              <label className="block mb-1 text-[13px]">
-                Recall Days (1-365)
-              </label>
-              <input
-                type="text"
-                onKeyDown={(e) => {
-                  if (
-                    !/[0-9]/.test(e.key) &&
-                    e.key !== "Backspace" &&
-                    e.key !== "Delete" &&
-                    e.key !== "ArrowLeft" &&
-                    e.key !== "ArrowRight" &&
-                    e.key !== "Tab"
-                  ) {
-                    e.preventDefault();
-                  }
-                }}
-                className="w-full h-8 border border-[#8a8a8a] rounded-lg px-3 text-[13px] leading-none focus:outline-none bg-[#fdfdfd]"
-              />
-              <p className="block mb-1 text-[13px] mt-1">
-                Enter a number between 1-365 days
-              </p>
-            </div>
-
-            <div className="">
-              <label className="block mb-1 text-[13px]">
-                Rejoin Points (1-10000)
-              </label>
-              <input
-                type="text"
-                onKeyDown={(e) => {
-                  if (
-                    !/[0-9]/.test(e.key) &&
-                    e.key !== "Backspace" &&
-                    e.key !== "Delete" &&
-                    e.key !== "ArrowLeft" &&
-                    e.key !== "ArrowRight" &&
-                    e.key !== "Tab"
-                  ) {
-                    e.preventDefault();
-                  }
-                }}
-                className="w-full h-8 border border-[#8a8a8a] rounded-lg px-3 text-[13px] leading-none focus:outline-none bg-[#fdfdfd]"
-              />
-              <p className="block mb-1 text-[13px] mt-1">
-                Enter a number between 1-10000 points
-              </p>
-            </div>
-          </div>
-        </div>
+        <PointsOnRejoiningSection
+          enabled={settings.rejoin.enabled}
+          recallDays={settings.rejoin.recallDays}
+          points={settings.rejoin.points}
+          onToggleChange={settings.setRejoinEnabled}
+          onRecallDaysChange={settings.setRecallDays}
+          onPointsChange={settings.setRejoinPoints}
+        />
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3 justify-end mt-4">
@@ -345,16 +346,34 @@ export default function WaysToEarn() {
             color="primary"
             variant="flat"
             className="custom-btn-default"
+            onClick={() => handleSave(false)}
+            isLoading={saveLoading}
+            disabled={saveLoading || saveAndNextLoading}
           >
             Save
           </Button>
           <Button
             className="custom-btn"
+            onClick={() => handleSave(true)}
+            isLoading={saveAndNextLoading}
+            disabled={saveLoading || saveAndNextLoading}
           >
             Save & Next
           </Button>
         </div>
       </div>
+
+      {/* Unsaved Changes Modal */}
+      <UnsavedChangesModal
+        isOpen={unsavedChanges.showUnsavedModal}
+        onSave={unsavedChanges.handleSaveUnsavedChanges}
+        onDiscard={() => {
+          // Reset events to saved state before discarding
+          settings.setEvents(JSON.parse(JSON.stringify(savedEvents)));
+          unsavedChanges.handleDiscardUnsavedChanges();
+        }}
+        isLoading={saveLoading}
+      />
     </div>
   );
 }
