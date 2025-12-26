@@ -47,7 +47,7 @@ export default function WaysModal() {
                   </div>
 
                   <div className="border-b border-[#DEDEDE] hover:bg-[#f3f3f3]">
-                    <a href="#" className="flex gap-4 items-center p-4">
+                    <a href="/setup/ways-to-redeem/fixed-discount" className="flex gap-4 items-center p-4">
                       <div className="border border-[#DEDEDE] rounded-lg p-2 w-10 h-10 max-w-10 max-h-10">
                         <Image src={`${process.env.NEXT_PUBLIC_BASE_PATH}/images/fixed-discount.svg`} width={24} height={24} alt="Fixed Discount" priority />
                       </div>
@@ -56,7 +56,7 @@ export default function WaysModal() {
                   </div>
 
                   <div className="border-b border-[#DEDEDE] hover:bg-[#f3f3f3]">
-                    <a href="#" className="flex gap-4 items-center p-4">
+                    <a href="/setup/ways-to-redeem/free-shipping" className="flex gap-4 items-center p-4">
                       <div className="border border-[#DEDEDE] rounded-lg p-2 w-10 h-10 max-w-10 max-h-10">
                         <Image src={`${process.env.NEXT_PUBLIC_BASE_PATH}/images/free-shipping.svg`} width={24} height={24} alt="Free Shipping" priority />
                       </div>
@@ -65,7 +65,7 @@ export default function WaysModal() {
                   </div>
 
                   <div className="hover:bg-[#f3f3f3]">
-                    <a href="#" className="flex gap-4 items-center p-4">
+                    <a href="/setup/ways-to-redeem/free-product" className="flex gap-4 items-center p-4">
                       <div className="border border-[#DEDEDE] rounded-lg p-2 w-10 h-10 max-w-10 max-h-10">
                         <Image src={`${process.env.NEXT_PUBLIC_BASE_PATH}/images/free-products.svg`} width={24} height={24} alt="Free Products" priority />
                       </div>
