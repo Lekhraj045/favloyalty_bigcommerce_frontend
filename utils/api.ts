@@ -408,3 +408,302 @@ export async function getCollectSettings(
   console.log("✅ Collect settings fetched successfully:", result);
   return result;
 }
+
+// Redeem Settings Types
+export interface RedeemCoupon {
+  _id?: string;
+  store_id?: string;
+  channel_id?: string;
+  redeemType: "purchase" | "freeShipping" | "freeProduct" | "storeCredit" | "orderPoint";
+  coupon?: {
+    active: boolean;
+    price_rule_id?: string;
+    target_type?: string;
+    name?: string;
+    lowerCaseName?: string;
+    value?: number;
+    discountAmount?: number;
+    expire?: string | null;
+    hasExpiry?: boolean;
+    restriction?: {
+      status?: boolean;
+      maxReduption?: {
+        status?: boolean;
+        value?: number;
+      };
+      selectedCustomber?: {
+        status?: boolean;
+        tier?: Array<{
+          status: boolean;
+          name: string;
+          tierId: string;
+          tierIndex: number;
+        }>;
+        tag?: Array<{
+          status: boolean;
+          name: string;
+          tagId: string;
+        }>;
+      };
+      selectedItems?: {
+        status?: boolean;
+        items?: Array<{
+          types: string;
+          value: string;
+          imgUrl: string;
+          pointRequired: string;
+          itemUrl: string;
+          ids: string;
+          price: string;
+          variantId: string;
+          productId: string;
+        }>;
+      };
+      selectedCollections?: {
+        status?: boolean;
+        collections?: Array<{
+          value: string;
+          imgUrl: string;
+          collectionUrl: string;
+          ids: string;
+          pointRequired: string;
+        }>;
+      };
+      minimumPurchaseAmount?: {
+        status?: boolean;
+        value?: number;
+      };
+      createdAt?: Date | string;
+      updatedAt?: Date | string;
+    };
+    createdAt?: Date | string;
+    updatedAt?: Date | string;
+  };
+  OrderFromPoint?: {
+    status?: boolean;
+    pointValue?: number;
+    amount?: number;
+    currencyCode?: string;
+    createdAt?: Date | string;
+    updatedAt?: Date | string;
+  };
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+}
+
+export async function getRedeemSettings(
+  storeId: string,
+  channelId: string
+): Promise<RedeemCoupon[]> {
+  console.log("📥 Fetching redeem settings:", { storeId, channelId });
+
+  const response = await fetch(
+    `${API_URL}/api/redeem-settings?storeId=${storeId}&channelId=${channelId}`,
+    {
+      headers: getAuthHeaders(),
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      console.log("ℹ️ No redeem settings found");
+      return [];
+    }
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error fetching redeem settings:", errorBody);
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to fetch redeem settings"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Redeem settings fetched successfully:", result);
+  
+  // Ensure we always return an array
+  return Array.isArray(result) ? result : [];
+}
+
+export interface CreateRedeemCouponData {
+  redeemType: "purchase" | "freeShipping" | "freeProduct" | "storeCredit" | "orderPoint";
+  target_type?: string;
+  pointValue: number;
+  discountAmount?: number;
+  expire?: string | null;
+  selectedItems?: Array<{
+    value: string;
+    type: string;
+    src: string;
+    pointRequired: string;
+    productUrl: string;
+    ids: string;
+    price: string;
+    variantId: string;
+    productId: string;
+  }>;
+  selectedCollections?: Array<{
+    value: string;
+    src: string;
+    collectionUrl: string;
+    ids: string;
+    pointRequired: string;
+  }>;
+  seletedCust?: {
+    tier: Array<{
+      status: boolean;
+      name: string;
+      tierId: string;
+      tierIndex: number;
+    }>;
+    tag: Array<{
+      status: boolean;
+      name: string;
+      tagId: string;
+    }>;
+  };
+  seletedCustDisable?: boolean;
+  seletedProductDisable?: boolean;
+  currentRestrictionType?: "product" | "collection";
+  onlineStoreDashBoardDisable?: boolean;
+  redemptionLimitDisable?: boolean;
+  redemptionLimit?: number;
+  minimumnPurchaseAmount?: number;
+  minimumnPurchaseAmountDisable?: boolean;
+}
+
+export async function createRedeemCoupon(
+  storeId: string,
+  channelId: string,
+  couponData: CreateRedeemCouponData
+): Promise<{ success: boolean; message: string; data?: any }> {
+  console.log("📤 Creating redeem coupon:", { storeId, channelId, couponData });
+
+  const response = await fetch(`${API_URL}/api/redeem-settings`, {
+    method: "POST",
+    headers: getAuthHeaders(true),
+    body: JSON.stringify({
+      storeId,
+      channelId,
+      ...couponData,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error creating redeem coupon:", errorBody);
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to create redeem coupon"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Redeem coupon created successfully:", result);
+  return result;
+}
+
+export async function updateRedeemCoupon(
+  couponId: string,
+  storeId: string,
+  channelId: string,
+  couponData: Partial<CreateRedeemCouponData>
+): Promise<{ success: boolean; message: string }> {
+  console.log("📤 Updating redeem coupon:", { couponId, storeId, channelId, couponData });
+
+  const response = await fetch(`${API_URL}/api/redeem-settings`, {
+    method: "PUT",
+    headers: getAuthHeaders(true),
+    body: JSON.stringify({
+      couponId,
+      storeId,
+      channelId,
+      ...couponData,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error updating redeem coupon:", errorBody);
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to update redeem coupon"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Redeem coupon updated successfully:", result);
+  return result;
+}
+
+export async function toggleCouponStatus(
+  couponId: string,
+  active: boolean
+): Promise<{ success: boolean; message: string; data?: any }> {
+  console.log("📤 Toggling coupon status:", { couponId, active });
+
+  try {
+    const response = await fetch(`${API_URL}/api/redeem-settings/toggle-status`, {
+      method: "PATCH",
+      headers: getAuthHeaders(true),
+      body: JSON.stringify({
+        couponId,
+        active,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      console.error("❌ Error toggling coupon status:", errorBody);
+      throw new Error(
+        errorBody.message || errorBody.error || "Failed to toggle coupon status"
+      );
+    }
+
+    const result = await response.json();
+    console.log("✅ Coupon status toggled successfully:", result);
+    return result;
+  } catch (error: any) {
+    // Handle network errors
+    if (error.name === "TypeError" && error.message === "Failed to fetch") {
+      console.error("❌ Network error - Backend server may not be running or CORS issue");
+      throw new Error(
+        "Unable to connect to server. Please check if the backend server is running."
+      );
+    }
+    throw error;
+  }
+}
+
+export async function deleteRedeemCoupon(
+  couponId: string
+): Promise<{ success: boolean; message: string }> {
+  console.log("📤 Deleting redeem coupon:", { couponId });
+
+  try {
+    const response = await fetch(`${API_URL}/api/redeem-settings`, {
+      method: "DELETE",
+      headers: getAuthHeaders(true),
+      body: JSON.stringify({
+        couponId,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      console.error("❌ Error deleting redeem coupon:", errorBody);
+      throw new Error(
+        errorBody.message || errorBody.error || "Failed to delete redeem coupon"
+      );
+    }
+
+    const result = await response.json();
+    console.log("✅ Redeem coupon deleted successfully:", result);
+    return result;
+  } catch (error: any) {
+    // Handle network errors
+    if (error.name === "TypeError" && error.message === "Failed to fetch") {
+      console.error("❌ Network error - Backend server may not be running or CORS issue");
+      throw new Error(
+        "Unable to connect to server. Please check if the backend server is running."
+      );
+    }
+    throw error;
+  }
+}
