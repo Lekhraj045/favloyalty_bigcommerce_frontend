@@ -1,13 +1,12 @@
-import React from "react";
+import { Button } from "@heroui/button";
 import {
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
+  useDisclosure,
 } from "@heroui/modal";
-import { Button } from "@heroui/button";
-import { useDisclosure } from "@heroui/modal";
 import Image from "next/image";
 
 interface WaysModalProps {

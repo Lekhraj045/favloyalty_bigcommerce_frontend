@@ -186,3 +186,9 @@ p {
  .custom-dropi.dropi-withoutLabel::before {
     transform: translateY(-50%);
 }
+
+input:disabled {
+    background-color: #f3f3f3;
+    color: #8a8a8a;
+    cursor: not-allowed;
+}

@@ -34,7 +34,7 @@ export default function ProductTable() {
         <TableBody>
           <TableRow key="1">
             <TableCell className="flex items-center gap-2">
-              <div className="w-10 h-10 max-w-[40px] max-h-[40px] border border-[#DEDEDE] rounded-lg overflow-hidden">
+              <div className="w-8 h-8 max-w-[36px] max-h-[36px] border border-[#DEDEDE] rounded-lg overflow-hidden">
                 <Image
                   src={`${process.env.NEXT_PUBLIC_BASE_PATH}/images/bike1.jpg`}
                   alt="bike1"
@@ -47,7 +47,7 @@ export default function ProductTable() {
 
             <TableCell>
               <div className="flex items-center gap-2">
-                <span className="text-xs">
+                <span className="text-xs max-w-[400px] truncate">
                   The 3p Fulfilled Snowboard - Default Title
                 </span>
                 <ExternalLink size={14} className="text-gray-400" />
@@ -71,7 +71,7 @@ export default function ProductTable() {
 
           <TableRow key="2">
             <TableCell className="flex items-center gap-2">
-              <div className="w-10 h-10 max-w-[40px] max-h-[40px] border border-[#DEDEDE] rounded-lg overflow-hidden">
+              <div className="w-8 h-8 max-w-[36px] max-h-[36px] border border-[#DEDEDE] rounded-lg overflow-hidden">
                 <Image
                   src={`${process.env.NEXT_PUBLIC_BASE_PATH}/images/bike2.jpg`}
                   alt="bike1"
@@ -84,8 +84,8 @@ export default function ProductTable() {
 
             <TableCell>
               <div className="flex items-center gap-2">
-                <span className="text-xs">
-                  The 3p Fulfilled Snowboard - Default Title
+                <span className="text-xs max-w-[400px] truncate">
+                  The 3p Fulfilled Snowboard - Default Title The 3p Fulfilled Snowboard - Default TitleThe 3p Fulfilled Snowboard - Default TitleThe 3p Fulfilled Snowboard - Default Title
                 </span>
                 <ExternalLink size={14} className="text-gray-400" />
               </div>
