@@ -1,7 +1,8 @@
 "use client";
 
-import { useAppSelector } from "@/store/hooks";
+import { useAppSelector, useAppDispatch } from "@/store/hooks";
 import { store } from "@/store/store";
+import { setPointsData } from "@/store/slices/pointsSlice";
 import {
   CustomPointName,
   getPoints,
@@ -71,6 +72,7 @@ export default function PointsSetting() {
   const selectedChannel = useAppSelector(
     (state) => state.channel.selectedChannel
   );
+  const dispatch = useAppDispatch();
   const storeId = getStoreId();
   const channelId = selectedChannel?.id || null;
   const [pointId, setPointId] = useState<string | null>(null);
@@ -144,16 +146,21 @@ export default function PointsSetting() {
           setExpiry(data.expiry);
           setExpiriesInDays(data.expiriesInDays || 1);
           setTierStatus(data.tierStatus);
-          if (data.tier) {
-            setTiers(data.tier);
-          } else {
-            // Reset to default tiers if no tiers in data
-            setTiers([
-              { tierName: "Silver", pointRequired: 0, multiplier: 1 },
-              { tierName: "Gold", pointRequired: 1000, multiplier: 1.2 },
-              { tierName: "Platinum", pointRequired: 5000, multiplier: 1.5 },
-            ]);
-          }
+          const tiersToSet = data.tier || [
+            { tierName: "Silver", pointRequired: 0, multiplier: 1 },
+            { tierName: "Gold", pointRequired: 1000, multiplier: 1.2 },
+            { tierName: "Platinum", pointRequired: 5000, multiplier: 1.5 },
+          ];
+          setTiers(tiersToSet);
+          
+          // Save to Redux store (only save tiers if tier system is enabled)
+          dispatch(
+            setPointsData({
+              tierStatus: data.tierStatus,
+              tiers: data.tierStatus ? tiersToSet : [],
+              channelId: channelId,
+            })
+          );
           if (data.logo) {
             setLogoDetails(data.logo);
             // Find logo index
@@ -191,6 +198,14 @@ export default function PointsSetting() {
             "ℹ️ No points data found for this channel - resetting to defaults"
           );
           resetFormToDefaults();
+          // Clear Redux store for this channel
+          dispatch(
+            setPointsData({
+              tierStatus: false,
+              tiers: [],
+              channelId: channelId,
+            })
+          );
         }
       } catch (error: any) {
         // If 404 or not found, reset to defaults
@@ -375,6 +390,14 @@ export default function PointsSetting() {
         pointRequired: undefined,
         multiplier: undefined,
       }));
+      // Clear tiers from Redux when tier system is disabled
+      dispatch(
+        setPointsData({
+          tierStatus: false,
+          tiers: [],
+          channelId: channelId,
+        })
+      );
     }
   };
 
@@ -516,6 +539,15 @@ export default function PointsSetting() {
           promise: new Promise((resolve) => setTimeout(resolve, 1000)),
         });
 
+        // Save tiers to Redux store
+        dispatch(
+          setPointsData({
+            tierStatus: tierStatus,
+            tiers: tierStatus ? tiers : [],
+            channelId: currentChannelId,
+          })
+        );
+
         // Reset tier editing state after successful save
         setResetTierEditing(true);
         setTimeout(() => setResetTierEditing(false), 100);
@@ -541,6 +573,7 @@ export default function PointsSetting() {
       customLogo,
       isEditMode,
       pointId,
+      dispatch,
     ]
   );
 

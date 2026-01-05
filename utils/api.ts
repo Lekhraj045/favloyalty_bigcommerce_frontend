@@ -129,6 +129,7 @@ export async function loginWithSignedPayload(
 }
 
 export interface Tier {
+  _id?: string; // MongoDB ObjectId for the tier
   tierName: string;
   pointRequired: number;
   multiplier: number;
@@ -706,4 +707,71 @@ export async function deleteRedeemCoupon(
     }
     throw error;
   }
+}
+
+// Product Types
+export interface BigCommerceProduct {
+  id: number;
+  name: string;
+  sku: string;
+  price: string;
+  description: string;
+  imageUrl: string;
+  url: string;
+  isVisible: boolean;
+  type: string;
+}
+
+export interface ProductsResponse {
+  success: boolean;
+  data: BigCommerceProduct[];
+  meta?: {
+    pagination?: {
+      total: number;
+      count: number;
+      per_page: number;
+      current_page: number;
+      total_pages: number;
+    };
+  };
+}
+
+export async function getProducts(
+  storeId: string,
+  channelId: string | null,
+  keyword?: string,
+  limit: number = 50,
+  page: number = 1
+): Promise<ProductsResponse> {
+  console.log("📥 Fetching products:", { storeId, channelId, keyword, limit, page });
+
+  const queryParams = new URLSearchParams({
+    storeId,
+    limit: limit.toString(),
+    page: page.toString(),
+  });
+
+  if (channelId) {
+    queryParams.append("channelId", channelId);
+  }
+
+  if (keyword && keyword.trim()) {
+    queryParams.append("keyword", keyword.trim());
+  }
+
+  const response = await fetch(`${API_URL}/api/products?${queryParams.toString()}`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error fetching products:", errorBody);
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to fetch products"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Products fetched successfully:", result);
+  return result;
 }

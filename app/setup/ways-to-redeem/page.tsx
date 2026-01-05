@@ -1,18 +1,25 @@
 "use client";
 
-import { useState } from "react";
 import SetupHeader from "@/components/SetupHeader";
 import SetupNavigation from "@/components/SetupNavigation";
+import {
+  deleteRedeemCoupon,
+  toggleCouponStatus,
+  type RedeemCoupon,
+} from "@/utils/api";
 import { Button } from "@heroui/button";
+import type { Selection } from "@heroui/table";
+import { addToast } from "@heroui/toast";
 import { Trash2 } from "lucide-react";
 import Image from "next/image";
-import { toggleCouponStatus, deleteRedeemCoupon, type RedeemCoupon } from "@/utils/api";
-import { addToast } from "@heroui/toast";
-import type { Selection } from "@heroui/react";
+import { useState } from "react";
+import DeleteBulkCouponsModal from "./components/DeleteBulkCouponsModal";
+import FixedDiscountForm from "./components/FixedDiscountForm";
+import FreeProductForm from "./components/FreeProductForm";
+import FreeShippingForm from "./components/FreeShippingForm";
+import PercentageDiscountForm from "./components/PercentageDiscountForm";
 import WaysModal from "./components/WaysRedeemModal";
 import WaysRedeemTable from "./components/WaysRedeemTable";
-import PercentageDiscountForm from "./components/PercentageDiscountForm";
-import DeleteBulkCouponsModal from "./components/DeleteBulkCouponsModal";
 import { useRedeemSettings } from "./hooks";
 
 export default function WaysToRedeem() {
@@ -52,6 +59,15 @@ export default function WaysToRedeem() {
     if (coupon.redeemType === "purchase") {
       setSelectedForm("percentage-discount");
       setEditingCoupon(coupon);
+    } else if (coupon.redeemType === "storeCredit") {
+      setSelectedForm("fixed-discount");
+      setEditingCoupon(coupon);
+    } else if (coupon.redeemType === "freeShipping") {
+      setSelectedForm("free-shipping");
+      setEditingCoupon(coupon);
+    } else if (coupon.redeemType === "freeProduct") {
+      setSelectedForm("free-products");
+      setEditingCoupon(coupon);
     } else {
       // Handle other coupon types if needed
       addToast({
@@ -70,7 +86,10 @@ export default function WaysToRedeem() {
         description: "Coupon deleted successfully",
         color: "success",
       });
-      
+
+      // Clear selection after deletion
+      setSelectedKeys(new Set([]));
+
       // Refresh the coupon list
       await refreshRedeemSettings();
     } catch (error: any) {
@@ -85,7 +104,10 @@ export default function WaysToRedeem() {
   };
 
   const handleBulkDeleteClick = () => {
-    if (selectedKeys === "all" || (selectedKeys instanceof Set && selectedKeys.size > 0)) {
+    if (
+      selectedKeys === "all" ||
+      (selectedKeys instanceof Set && selectedKeys.size > 0)
+    ) {
       setBulkDeleteModalOpen(true);
     }
   };
@@ -100,7 +122,7 @@ export default function WaysToRedeem() {
     const allCouponIds = validCoupons
       .map((coupon) => coupon._id)
       .filter((id): id is string => !!id);
-    
+
     if (allCouponIds.length === 0) {
       setDeleteAllModalOpen(false);
       return;
@@ -110,13 +132,13 @@ export default function WaysToRedeem() {
     try {
       const deletePromises = allCouponIds.map((id) => deleteRedeemCoupon(id));
       await Promise.all(deletePromises);
-      
+
       addToast({
         title: "Success",
         description: `All ${allCouponIds.length} coupon(s) deleted successfully`,
         color: "success",
       });
-      
+
       setSelectedKeys(new Set([]));
       await refreshRedeemSettings();
     } catch (error: any) {
@@ -138,7 +160,7 @@ export default function WaysToRedeem() {
       const allCouponIds = validCoupons
         .map((coupon) => coupon._id)
         .filter((id): id is string => !!id);
-      
+
       if (allCouponIds.length === 0) {
         setBulkDeleteModalOpen(false);
         return;
@@ -148,13 +170,13 @@ export default function WaysToRedeem() {
       try {
         const deletePromises = allCouponIds.map((id) => deleteRedeemCoupon(id));
         await Promise.all(deletePromises);
-        
+
         addToast({
           title: "Success",
           description: `All ${allCouponIds.length} coupon(s) deleted successfully`,
           color: "success",
         });
-        
+
         setSelectedKeys(new Set([]));
         await refreshRedeemSettings();
       } catch (error: any) {
@@ -173,7 +195,7 @@ export default function WaysToRedeem() {
       const selectedCouponIds = Array.from(selectedKeys).filter(
         (id): id is string => typeof id === "string"
       );
-      
+
       if (selectedCouponIds.length === 0) {
         setBulkDeleteModalOpen(false);
         return;
@@ -181,15 +203,17 @@ export default function WaysToRedeem() {
 
       setDeletingBulk(true);
       try {
-        const deletePromises = selectedCouponIds.map((id) => deleteRedeemCoupon(id));
+        const deletePromises = selectedCouponIds.map((id) =>
+          deleteRedeemCoupon(id)
+        );
         await Promise.all(deletePromises);
-        
+
         addToast({
           title: "Success",
           description: `${selectedCouponIds.length} coupon(s) deleted successfully`,
           color: "success",
         });
-        
+
         setSelectedKeys(new Set([]));
         await refreshRedeemSettings();
       } catch (error: any) {
@@ -207,11 +231,12 @@ export default function WaysToRedeem() {
   };
 
   // Calculate selected count
-  const selectedCount = selectedKeys === "all" 
-    ? validCoupons.length 
-    : selectedKeys instanceof Set 
-      ? selectedKeys.size 
-      : 0;
+  const selectedCount =
+    selectedKeys === "all"
+      ? validCoupons.length
+      : selectedKeys instanceof Set
+        ? selectedKeys.size
+        : 0;
 
   const handleSave = async () => {
     if (!hasUnsavedChanges) {
@@ -229,10 +254,12 @@ export default function WaysToRedeem() {
       // Find coupons that have changed status
       const changedCoupons = redeemCoupons.filter((coupon) => {
         if (!coupon._id || !coupon.coupon) return false;
-        
-        const originalCoupon = originalCoupons.find((oc) => oc._id === coupon._id);
+
+        const originalCoupon = originalCoupons.find(
+          (oc) => oc._id === coupon._id
+        );
         if (!originalCoupon || !originalCoupon.coupon) return false;
-        
+
         // Check if active status changed
         return coupon.coupon.active !== originalCoupon.coupon.active;
       });
@@ -292,6 +319,39 @@ export default function WaysToRedeem() {
               refreshRedeemSettings();
             }}
           />
+        ) : selectedForm === "fixed-discount" ? (
+          <FixedDiscountForm
+            onBack={handleBackToList}
+            coupon={editingCoupon}
+            onSuccess={() => {
+              handleBackToList();
+              setEditingCoupon(null);
+              // Refresh redeem coupons
+              refreshRedeemSettings();
+            }}
+          />
+        ) : selectedForm === "free-shipping" ? (
+          <FreeShippingForm
+            onBack={handleBackToList}
+            coupon={editingCoupon}
+            onSuccess={() => {
+              handleBackToList();
+              setEditingCoupon(null);
+              // Refresh redeem coupons
+              refreshRedeemSettings();
+            }}
+          />
+        ) : selectedForm === "free-products" ? (
+          <FreeProductForm
+            onBack={handleBackToList}
+            coupon={editingCoupon}
+            onSuccess={() => {
+              handleBackToList();
+              setEditingCoupon(null);
+              // Refresh redeem coupons
+              refreshRedeemSettings();
+            }}
+          />
         ) : (
           <>
             <div className="flex flex-col gap-4">
@@ -303,7 +363,7 @@ export default function WaysToRedeem() {
 
                   <div className="flex gap-4">
                     {hasCoupons && selectedCount > 0 && (
-                      <Button 
+                      <Button
                         className="custom-btn-default"
                         onClick={handleBulkDeleteClick}
                       >
@@ -312,7 +372,7 @@ export default function WaysToRedeem() {
                       </Button>
                     )}
                     {hasCoupons && (
-                      <Button 
+                      <Button
                         className="custom-btn-default"
                         onClick={handleDeleteAllClick}
                       >

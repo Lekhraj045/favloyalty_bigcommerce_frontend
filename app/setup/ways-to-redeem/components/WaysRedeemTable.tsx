@@ -1,5 +1,5 @@
-import { useState } from "react";
 import type { RedeemCoupon } from "@/utils/api";
+import type { Selection } from "@heroui/react";
 import { Switch } from "@heroui/switch";
 import {
   Table,
@@ -12,7 +12,7 @@ import {
 import { Tooltip } from "@heroui/tooltip";
 import { SquarePen, Trash2 } from "lucide-react";
 import Image from "next/image";
-import type { Selection } from "@heroui/react";
+import { useState } from "react";
 import DeleteCouponModal from "./DeleteCouponModal";
 
 interface WaysRedeemTableProps {
@@ -72,29 +72,60 @@ const getCouponDisplayName = (coupon: RedeemCoupon): string => {
   return formatRedeemType(coupon.redeemType);
 };
 
-// Helper function to calculate expiry days
+// Helper function to get expiry days display
 const getExpiryDays = (coupon: RedeemCoupon): string | null => {
   if (!coupon.coupon?.hasExpiry || !coupon.coupon?.expire) {
     return null;
   }
 
   try {
-    const expireDate = new Date(coupon.coupon.expire);
-    const now = new Date();
-    const diffTime = expireDate.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const expire = coupon.coupon.expire;
 
-    if (diffDays < 0) {
-      return "Expired";
+    // If expire is a number or numeric string (days), display it directly
+    const daysNum =
+      typeof expire === "number" ? expire : parseInt(expire.toString());
+
+    if (!isNaN(daysNum) && daysNum > 0) {
+      // It's a number representing days
+      if (daysNum === 1) {
+        return "1 Day";
+      }
+      return `${daysNum} Days`;
     }
-    if (diffDays === 0) {
-      return "Today";
+
+    // If it's not a number, try to parse it as a date
+    const expireDate = new Date(expire);
+
+    // Check if it's a valid date
+    if (!isNaN(expireDate.getTime())) {
+      const now = new Date();
+      const diffTime = expireDate.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays < 0) {
+        return "Expired";
+      }
+      if (diffDays === 0) {
+        return "Today";
+      }
+      if (diffDays === 1) {
+        return "1 Day";
+      }
+      return `${diffDays} Days`;
     }
-    if (diffDays === 1) {
-      return "1 Day";
-    }
-    return `${diffDays} Days`;
+
+    // If we can't parse it, return null
+    return null;
   } catch (error) {
+    // If expire is a string number, try to display it
+    const expireStr = coupon.coupon.expire?.toString();
+    if (expireStr && /^\d+$/.test(expireStr)) {
+      const days = parseInt(expireStr);
+      if (days === 1) {
+        return "1 Day";
+      }
+      return `${days} Days`;
+    }
     return null;
   }
 };
@@ -116,13 +147,16 @@ export default function WaysRedeemTable({
   } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const handleToggleCoupon = (couponId: string | undefined, currentStatus: boolean) => {
+  const handleToggleCoupon = (
+    couponId: string | undefined,
+    currentStatus: boolean
+  ) => {
     if (!couponId) {
       return;
     }
 
     const newStatus = !currentStatus;
-    
+
     // Update local state immediately
     if (onToggleCoupon) {
       onToggleCoupon(couponId, newStatus);
@@ -131,12 +165,15 @@ export default function WaysRedeemTable({
 
   const handleDeleteClick = (coupon: RedeemCoupon) => {
     if (!coupon._id) return;
-    
-    const couponName = coupon.coupon?.name || 
-                      (coupon.coupon?.discountAmount ? `$${coupon.coupon.discountAmount} off` : 
-                      coupon.coupon?.value ? `${coupon.coupon.value}% off` : 
-                      "this coupon");
-    
+
+    const couponName =
+      coupon.coupon?.name ||
+      (coupon.coupon?.discountAmount
+        ? `$${coupon.coupon.discountAmount} off`
+        : coupon.coupon?.value
+          ? `${coupon.coupon.value}% off`
+          : "this coupon");
+
     setCouponToDelete({
       id: coupon._id,
       name: couponName,
@@ -172,7 +209,7 @@ export default function WaysRedeemTable({
         classNames={{
           th: "bg-[#F7F7F7] text-xs font-normal text-[#616161] px-3 py-2",
           td: "text-xs text-[#303030] px-3 py-2 border-t border-[#E3E3E3]",
-          base: "max-h-[220px] overflow-y-auto",
+          base: "max-h-[360px] overflow-y-auto",
         }}
       >
         <TableHeader>
@@ -200,8 +237,11 @@ export default function WaysRedeemTable({
             const isActive = coupon.coupon?.active || false;
             const iconPath = getRedeemTypeIcon(coupon.redeemType);
 
-            const rowKey = coupon._id || coupon.coupon?.price_rule_id || `coupon-${Math.random()}`;
-            
+            const rowKey =
+              coupon._id ||
+              coupon.coupon?.price_rule_id ||
+              `coupon-${Math.random()}`;
+
             return (
               <TableRow key={rowKey}>
                 <TableCell>

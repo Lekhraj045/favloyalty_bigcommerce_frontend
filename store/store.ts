@@ -1,9 +1,11 @@
 import { configureStore } from "@reduxjs/toolkit";
 import channelReducer from "./slices/channelSlice";
+import pointsReducer from "./slices/pointsSlice";
 
 export const store = configureStore({
   reducer: {
     channel: channelReducer,
+    points: pointsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

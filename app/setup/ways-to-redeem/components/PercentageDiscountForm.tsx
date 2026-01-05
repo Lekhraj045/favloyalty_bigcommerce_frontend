@@ -10,6 +10,10 @@ import { createRedeemCoupon, updateRedeemCoupon, type CreateRedeemCouponData, ty
 import { addToast } from "@heroui/toast";
 import { useEffect } from "react";
 import ProductTable from "../percentage-discount/components/ProductTable";
+import ProductSearchDropdown from "./ProductSearchDropdown";
+import CustomerTierSelection from "./CustomerTierSelection";
+import { validateTiers } from "../utils/tierValidation";
+import type { BigCommerceProduct } from "@/utils/api";
 
 interface PercentageDiscountFormProps {
   onBack: () => void;
@@ -37,6 +41,13 @@ export default function PercentageDiscountForm({
   const [currentRestrictionType, setCurrentRestrictionType] = useState<"product" | "collection">("product");
   const [selectedItems, setSelectedItems] = useState<CreateRedeemCouponData["selectedItems"]>([]);
   const [selectedCollections, setSelectedCollections] = useState<CreateRedeemCouponData["selectedCollections"]>([]);
+  const [selectedTiers, setSelectedTiers] = useState<Array<{
+    status: boolean;
+    name: string;
+    tierId: string;
+    tierIndex: number;
+  }>>([]);
+  const [customerRestrictionEnabled, setCustomerRestrictionEnabled] = useState<boolean>(true); // true = disabled (no restriction)
   const [loading, setLoading] = useState(false);
 
   // Load coupon data when editing, or reset form when creating new
@@ -104,6 +115,26 @@ export default function PercentageDiscountForm({
         setSelectedItems([]);
         setSelectedCollections([]);
       }
+
+      // Handle customer tier restrictions
+      // Backend stores at coupon.restriction.selectedCustomber
+      const selectedCustomber = coupon.coupon?.restriction?.selectedCustomber;
+      if (selectedCustomber) {
+        // status: true = restriction enabled, false = restriction disabled
+        // customerRestrictionEnabled: true = disabled (no restriction), false = enabled (restriction ON)
+        // So: customerRestrictionEnabled = !selectedCustomber.status
+        setCustomerRestrictionEnabled(!selectedCustomber.status);
+        if (selectedCustomber.tier && selectedCustomber.tier.length > 0) {
+          // Validate tierIds when loading from existing coupon
+          const validatedTiers = validateTiers(selectedCustomber.tier);
+          setSelectedTiers(validatedTiers);
+        } else {
+          setSelectedTiers([]);
+        }
+      } else {
+        setCustomerRestrictionEnabled(true); // Default: no restriction
+        setSelectedTiers([]);
+      }
     } else {
       // Reset form when creating new coupon
       setPointValue("");
@@ -113,6 +144,8 @@ export default function PercentageDiscountForm({
       setCurrentRestrictionType("product");
       setSelectedItems([]);
       setSelectedCollections([]);
+      setCustomerRestrictionEnabled(true);
+      setSelectedTiers([]);
     }
   }, [coupon]);
 
@@ -236,6 +269,9 @@ export default function PercentageDiscountForm({
     setLoading(true);
 
     try {
+      // Validate and fix tierIds to ensure they're valid ObjectIds
+      const validatedTiers = validateTiers(selectedTiers);
+
       // Prepare coupon data according to migration report
       const couponData: CreateRedeemCouponData = {
         redeemType: "purchase",
@@ -246,10 +282,10 @@ export default function PercentageDiscountForm({
         selectedItems: allowCouponForProduct ? [] : selectedItems,
         selectedCollections: allowCouponForProduct ? [] : selectedCollections,
         seletedCust: {
-          tier: [],
+          tier: validatedTiers,
           tag: [],
         },
-        seletedCustDisable: true, // No customer restriction by default
+        seletedCustDisable: customerRestrictionEnabled, // true = disabled (no restriction)
         seletedProductDisable: allowCouponForProduct, // true = no restriction
         currentRestrictionType: currentRestrictionType,
         onlineStoreDashBoardDisable: false,
@@ -294,6 +330,8 @@ export default function PercentageDiscountForm({
           setAllowCouponForProduct(true);
           setSelectedItems([]);
           setSelectedCollections([]);
+          setCustomerRestrictionEnabled(true);
+          setSelectedTiers([]);
           
           // Call success callback or go back
           if (onSuccess) {
@@ -518,19 +556,106 @@ export default function PercentageDiscountForm({
               </div>
 
               <div className="flex-1">
-                <input
-                  type="text"
-                  placeholder="Search Products"
-                  className="w-full h-8 border border-[#8a8a8a] rounded-lg px-3 text-[13px] leading-none focus:outline-none bg-[#fdfdfd]"
-                />
+                {currentRestrictionType === "product" ? (
+                  <ProductSearchDropdown
+                    type="product"
+                    onSelectProduct={(product: BigCommerceProduct) => {
+                      // Convert BigCommerce product to selectedItems format
+                      const newItem = {
+                        value: product.name,
+                        type: "product",
+                        src: product.imageUrl || "",
+                        pointRequired: "0", // Will be calculated based on coupon settings
+                        productUrl: product.url || "",
+                        ids: product.id.toString(),
+                        price: product.price || "0.00",
+                        variantId: "", // Variant ID not available from product list
+                        productId: product.id.toString(),
+                      };
+                      setSelectedItems([...selectedItems, newItem]);
+                    }}
+                    selectedProducts={selectedItems.map((item) => ({
+                      id: parseInt(item.ids || "0"),
+                      name: item.value,
+                      sku: "",
+                      price: item.price || "0.00",
+                      description: "",
+                      imageUrl: item.src,
+                      url: item.productUrl || "",
+                      isVisible: true,
+                      type: "physical",
+                    }))}
+                  />
+                ) : (
+                  <ProductSearchDropdown
+                    type="collection"
+                    onSelectProduct={(product: BigCommerceProduct) => {
+                      // For collections, we'll handle this differently
+                      // For now, treat it as a product
+                      const newItem = {
+                        value: product.name,
+                        src: product.imageUrl || "",
+                        collectionUrl: product.url || "",
+                        ids: product.id.toString(),
+                        pointRequired: "0",
+                      };
+                      setSelectedCollections([...selectedCollections, newItem]);
+                    }}
+                    selectedProducts={selectedCollections.map((item) => ({
+                      id: parseInt(item.ids || "0"),
+                      name: item.value,
+                      sku: "",
+                      price: "0.00",
+                      description: "",
+                      imageUrl: item.src,
+                      url: item.collectionUrl || "",
+                      isVisible: true,
+                      type: "physical",
+                    }))}
+                  />
+                )}
               </div>
             </div>
 
             {/* Product Table */}
-            <ProductTable />
+            {currentRestrictionType === "product" ? (
+              <ProductTable
+                items={selectedItems}
+                onRemove={(index) => {
+                  const newItems = [...selectedItems];
+                  newItems.splice(index, 1);
+                  setSelectedItems(newItems);
+                }}
+                type="product"
+              />
+            ) : (
+              <ProductTable
+                items={selectedCollections.map((col) => ({
+                  value: col.value,
+                  type: "collection",
+                  src: col.src,
+                  productUrl: col.collectionUrl,
+                  ids: col.ids,
+                }))}
+                onRemove={(index) => {
+                  const newCollections = [...selectedCollections];
+                  newCollections.splice(index, 1);
+                  setSelectedCollections(newCollections);
+                }}
+                type="collection"
+              />
+            )}
           </div>
         )}
       </div>
+
+      {/* Customer Tier Selection */}
+      <CustomerTierSelection
+        selectedTiers={selectedTiers}
+        customerRestrictionEnabled={customerRestrictionEnabled}
+        onTiersChange={setSelectedTiers}
+        onRestrictionToggle={setCustomerRestrictionEnabled}
+      />
 
       <div className="flex items-center justify-end mt-4">
         <Button
