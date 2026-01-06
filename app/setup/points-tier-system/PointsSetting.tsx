@@ -19,6 +19,7 @@ import { Switch } from "@heroui/switch";
 import { addToast } from "@heroui/toast";
 import { Upload } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import CustomPointNameModal from "./CustomPointNameModal";
 import TierTable from "./TierTable";
@@ -33,6 +34,8 @@ interface ValidationErrors {
 }
 
 export default function PointsSetting() {
+  const router = useRouter();
+  
   // Form state
   const [pointName, setPointName] = useState<string>("Points");
   const [selectedPointNameOption, setSelectedPointNameOption] =
@@ -147,9 +150,9 @@ export default function PointsSetting() {
           setExpiriesInDays(data.expiriesInDays || 1);
           setTierStatus(data.tierStatus);
           const tiersToSet = data.tier || [
-            { tierName: "Silver", pointRequired: 0, multiplier: 1 },
-            { tierName: "Gold", pointRequired: 1000, multiplier: 1.2 },
-            { tierName: "Platinum", pointRequired: 5000, multiplier: 1.5 },
+              { tierName: "Silver", pointRequired: 0, multiplier: 1 },
+              { tierName: "Gold", pointRequired: 1000, multiplier: 1.2 },
+              { tierName: "Platinum", pointRequired: 5000, multiplier: 1.5 },
           ];
           setTiers(tiersToSet);
           
@@ -586,8 +589,8 @@ export default function PointsSetting() {
   // Save and Next function
   const handleSaveAndNext = useCallback(async () => {
     await performSave(setSaveAndNextLoading);
-    // Navigate to next step (you can implement navigation logic here)
-    // Example: router.push('/setup/next-step');
+    // Navigate to next step: Ways to Earn
+    window.location.href = '/setup/ways-to-earn';
   }, [performSave]);
 
   // Show message if no channel is selected

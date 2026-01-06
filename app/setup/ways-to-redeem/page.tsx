@@ -34,7 +34,8 @@ export default function WaysToRedeem() {
   } = useRedeemSettings();
   const [selectedForm, setSelectedForm] = useState<string | null>(null);
   const [editingCoupon, setEditingCoupon] = useState<RedeemCoupon | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveAndNextLoading, setSaveAndNextLoading] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set([]));
   const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
   const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
@@ -238,17 +239,24 @@ export default function WaysToRedeem() {
         ? selectedKeys.size
         : 0;
 
-  const handleSave = async () => {
+  const handleSave = async (isNext: boolean = false) => {
+    // Use the appropriate loading state based on isNext
+    const loadingSetter = isNext ? setSaveAndNextLoading : setSaveLoading;
+    
     if (!hasUnsavedChanges) {
       addToast({
         title: "Info",
         description: "No changes to save",
         color: "default",
       });
+      // If Save & Next but no changes, still navigate
+      if (isNext) {
+        window.location.href = '/setup/customise-widget';
+      }
       return;
     }
 
-    setSaving(true);
+    loadingSetter(true);
 
     try {
       // Find coupons that have changed status
@@ -270,7 +278,11 @@ export default function WaysToRedeem() {
           description: "No changes to save",
           color: "default",
         });
-        setSaving(false);
+        loadingSetter(false);
+        // If Save & Next but no changes, still navigate
+        if (isNext) {
+          window.location.href = '/setup/customise-widget';
+        }
         return;
       }
 
@@ -289,6 +301,13 @@ export default function WaysToRedeem() {
 
       // Refresh to get latest state from server
       await refreshRedeemSettings();
+
+      // If Save & Next, navigate to next step: Customise Widget
+      if (isNext) {
+        loadingSetter(false);
+        window.location.href = '/setup/customise-widget';
+        return;
+      }
     } catch (error: any) {
       console.error("Error saving coupon settings:", error);
       addToast({
@@ -297,7 +316,10 @@ export default function WaysToRedeem() {
         color: "danger",
       });
     } finally {
-      setSaving(false);
+      // Only reset loading if not navigating (isNext = false)
+      if (!isNext) {
+        loadingSetter(false);
+      }
     }
   };
 
@@ -432,17 +454,17 @@ export default function WaysToRedeem() {
                 color="primary"
                 variant="flat"
                 className="custom-btn-default"
-                onClick={handleSave}
-                isLoading={saving}
-                disabled={!hasUnsavedChanges || saving}
+                onClick={() => handleSave(false)}
+                isLoading={saveLoading}
+                disabled={!hasUnsavedChanges || saveLoading || saveAndNextLoading}
               >
                 Save
               </Button>
               <Button
                 className="custom-btn"
-                onClick={handleSave}
-                isLoading={saving}
-                disabled={!hasUnsavedChanges || saving}
+                onClick={() => handleSave(true)}
+                isLoading={saveAndNextLoading}
+                disabled={!hasUnsavedChanges || saveLoading || saveAndNextLoading}
               >
                 Save & Next
               </Button>

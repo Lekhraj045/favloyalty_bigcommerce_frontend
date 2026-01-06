@@ -415,7 +415,12 @@ export interface RedeemCoupon {
   _id?: string;
   store_id?: string;
   channel_id?: string;
-  redeemType: "purchase" | "freeShipping" | "freeProduct" | "storeCredit" | "orderPoint";
+  redeemType:
+    | "purchase"
+    | "freeShipping"
+    | "freeProduct"
+    | "storeCredit"
+    | "orderPoint";
   coupon?: {
     active: boolean;
     price_rule_id?: string;
@@ -519,13 +524,18 @@ export async function getRedeemSettings(
 
   const result = await response.json();
   console.log("✅ Redeem settings fetched successfully:", result);
-  
+
   // Ensure we always return an array
   return Array.isArray(result) ? result : [];
 }
 
 export interface CreateRedeemCouponData {
-  redeemType: "purchase" | "freeShipping" | "freeProduct" | "storeCredit" | "orderPoint";
+  redeemType:
+    | "purchase"
+    | "freeShipping"
+    | "freeProduct"
+    | "storeCredit"
+    | "orderPoint";
   target_type?: string;
   pointValue: number;
   discountAmount?: number;
@@ -607,7 +617,12 @@ export async function updateRedeemCoupon(
   channelId: string,
   couponData: Partial<CreateRedeemCouponData>
 ): Promise<{ success: boolean; message: string }> {
-  console.log("📤 Updating redeem coupon:", { couponId, storeId, channelId, couponData });
+  console.log("📤 Updating redeem coupon:", {
+    couponId,
+    storeId,
+    channelId,
+    couponData,
+  });
 
   const response = await fetch(`${API_URL}/api/redeem-settings`, {
     method: "PUT",
@@ -640,14 +655,17 @@ export async function toggleCouponStatus(
   console.log("📤 Toggling coupon status:", { couponId, active });
 
   try {
-    const response = await fetch(`${API_URL}/api/redeem-settings/toggle-status`, {
-      method: "PATCH",
-      headers: getAuthHeaders(true),
-      body: JSON.stringify({
-        couponId,
-        active,
-      }),
-    });
+    const response = await fetch(
+      `${API_URL}/api/redeem-settings/toggle-status`,
+      {
+        method: "PATCH",
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({
+          couponId,
+          active,
+        }),
+      }
+    );
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
@@ -663,7 +681,9 @@ export async function toggleCouponStatus(
   } catch (error: any) {
     // Handle network errors
     if (error.name === "TypeError" && error.message === "Failed to fetch") {
-      console.error("❌ Network error - Backend server may not be running or CORS issue");
+      console.error(
+        "❌ Network error - Backend server may not be running or CORS issue"
+      );
       throw new Error(
         "Unable to connect to server. Please check if the backend server is running."
       );
@@ -700,7 +720,9 @@ export async function deleteRedeemCoupon(
   } catch (error: any) {
     // Handle network errors
     if (error.name === "TypeError" && error.message === "Failed to fetch") {
-      console.error("❌ Network error - Backend server may not be running or CORS issue");
+      console.error(
+        "❌ Network error - Backend server may not be running or CORS issue"
+      );
       throw new Error(
         "Unable to connect to server. Please check if the backend server is running."
       );
@@ -743,7 +765,13 @@ export async function getProducts(
   limit: number = 50,
   page: number = 1
 ): Promise<ProductsResponse> {
-  console.log("📥 Fetching products:", { storeId, channelId, keyword, limit, page });
+  console.log("📥 Fetching products:", {
+    storeId,
+    channelId,
+    keyword,
+    limit,
+    page,
+  });
 
   const queryParams = new URLSearchParams({
     storeId,
@@ -759,9 +787,12 @@ export async function getProducts(
     queryParams.append("keyword", keyword.trim());
   }
 
-  const response = await fetch(`${API_URL}/api/products?${queryParams.toString()}`, {
-    headers: getAuthHeaders(),
-  });
+  const response = await fetch(
+    `${API_URL}/api/products?${queryParams.toString()}`,
+    {
+      headers: getAuthHeaders(),
+    }
+  );
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
@@ -773,5 +804,192 @@ export async function getProducts(
 
   const result = await response.json();
   console.log("✅ Products fetched successfully:", result);
+  return result;
+}
+
+// Widget Customization Types
+export interface WidgetCustomization {
+  _id?: string;
+  store_id?: string;
+  channel_id?: string;
+  widgetIconUrlId?: string | null;
+  widgetBgColor?: string;
+  backgroundPatternEnabled?: boolean;
+  widgetButton?: string;
+  announcements?: Array<{
+    _id?: string;
+    enable: boolean;
+    image: string | null;
+    link: string | null;
+  }>;
+  displayOption?: Array<{
+    _id?: string;
+    label: string;
+    enable: boolean;
+  }>;
+  backgroundPatternUrlId?: string | null;
+  metaData?: {
+    createdAt?: Date | string;
+    updatedAt?: Date | string;
+  };
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+}
+
+export interface CreateWidgetCustomizationData {
+  storeId: string;
+  channelId: string;
+  widgetIconUrlId?: string | null;
+  widgetBgColor?: string;
+  backgroundPatternEnabled?: boolean;
+  widgetButton?: string;
+  announcements?: Array<{
+    enable: boolean;
+    image: string | null;
+    link: string | null;
+  }>;
+  displayOption?: Array<{
+    label: string;
+    enable: boolean;
+  }>;
+  backgroundPatternUrlId?: string | null;
+}
+
+// Get widget customization
+export async function getWidgetCustomization(
+  storeId: string,
+  channelId: string
+): Promise<WidgetCustomization | null> {
+  console.log("📥 Fetching widget customization:", { storeId, channelId });
+
+  const response = await fetch(
+    `${API_URL}/api/widget-customization?storeId=${storeId}&channelId=${channelId}`,
+    {
+      headers: getAuthHeaders(),
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      console.log("ℹ️ No widget customization found");
+      return null;
+    }
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error fetching widget customization:", errorBody);
+    throw new Error(
+      errorBody.message ||
+        errorBody.error ||
+        "Failed to fetch widget customization"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Widget customization fetched successfully:", result);
+  return result;
+}
+
+// Create or update widget customization
+export async function saveWidgetCustomization(
+  storeId: string,
+  channelId: string,
+  widgetData: Omit<CreateWidgetCustomizationData, "storeId" | "channelId">
+): Promise<{ success: boolean; message: string; data?: WidgetCustomization }> {
+  console.log("📤 Saving widget customization:", {
+    storeId,
+    channelId,
+    widgetData,
+  });
+
+  const response = await fetch(`${API_URL}/api/widget-customization`, {
+    method: "POST",
+    headers: getAuthHeaders(true),
+    body: JSON.stringify({
+      storeId,
+      channelId,
+      ...widgetData,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error saving widget customization:", errorBody);
+    throw new Error(
+      errorBody.message ||
+        errorBody.error ||
+        "Failed to save widget customization"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Widget customization saved successfully:", result);
+  return result;
+}
+
+// Update widget customization
+export async function updateWidgetCustomization(
+  storeId: string,
+  channelId: string,
+  widgetData: Partial<
+    Omit<CreateWidgetCustomizationData, "storeId" | "channelId">
+  >
+): Promise<{ success: boolean; message: string; data?: WidgetCustomization }> {
+  console.log("📤 Updating widget customization:", {
+    storeId,
+    channelId,
+    widgetData,
+  });
+
+  const response = await fetch(`${API_URL}/api/widget-customization`, {
+    method: "PUT",
+    headers: getAuthHeaders(true),
+    body: JSON.stringify({
+      storeId,
+      channelId,
+      ...widgetData,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error updating widget customization:", errorBody);
+    throw new Error(
+      errorBody.message ||
+        errorBody.error ||
+        "Failed to update widget customization"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Widget customization updated successfully:", result);
+  return result;
+}
+
+// Delete widget customization
+export async function deleteWidgetCustomization(
+  storeId: string,
+  channelId: string
+): Promise<{ success: boolean; message: string }> {
+  console.log("📤 Deleting widget customization:", { storeId, channelId });
+
+  const response = await fetch(
+    `${API_URL}/api/widget-customization?storeId=${storeId}&channelId=${channelId}`,
+    {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error deleting widget customization:", errorBody);
+    throw new Error(
+      errorBody.message ||
+        errorBody.error ||
+        "Failed to delete widget customization"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Widget customization deleted successfully:", result);
   return result;
 }

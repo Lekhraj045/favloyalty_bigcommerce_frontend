@@ -185,7 +185,8 @@ export default function WaysToEarn() {
       }
 
       if (isNext) {
-        console.log("Navigate to next page");
+        // Navigate to next step: Ways to Redeem
+        window.location.href = '/setup/ways-to-redeem';
       }
     } catch (error: any) {
       console.error("Error saving settings:", error);
