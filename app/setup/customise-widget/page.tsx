@@ -2,12 +2,11 @@
 
 import SetupHeader from "@/components/SetupHeader";
 import SetupNavigation from "@/components/SetupNavigation";
-import { useAppSelector } from "@/store/hooks";
-import { getStoreId, saveWidgetCustomization } from "@/utils/api";
-import { Button } from "@heroui/button";
-import { addToast } from "@heroui/toast";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import AnnouncementsArea from "./components/Announcements";
+import BackgroundPatternArea from "./components/BackgroundPattern";
+import CustomiseWidgetArea from "./components/CustomiseWidget";
+import WidgetIconArea from "./components/WidgetIcon";
+import WidgetPreviewArea from "./components/WidgetPreview";
 
 export default function CustomiseWidget() {
   const router = useRouter();
@@ -108,40 +107,34 @@ export default function CustomiseWidget() {
           <SetupNavigation />
         </div>
 
-        <div className="card">
-          <div className="p-4">
-            <h2 className="text-lg font-semibold mb-2">Customise Widget</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Configure widget appearance and behavior settings.
-            </p>
+        <div className="flex gap-4 items-start">
+          <div className="flex-1">
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center gap-6">
+                <div className="flex flex-col gap-1">
+                  <h2 className="text-base font-bold">Customise Widget</h2>
+                </div>
+              </div>
 
-            {/* TODO: Add widget customization form components here */}
-            <div className="text-sm text-gray-500">
-              Widget customization form will be implemented here.
+              <CustomiseWidgetArea />
+
+              <BackgroundPatternArea />
+
+              <WidgetIconArea />
+
+              <AnnouncementsArea />
             </div>
           </div>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-3 justify-end mt-4">
-          <Button
-            color="primary"
-            variant="flat"
-            className="custom-btn-default"
-            onClick={() => handleSave(false)}
-            isLoading={saveLoading}
-            disabled={saveLoading || saveAndNextLoading}
-          >
-            Save
-          </Button>
-          <Button
-            className="custom-btn"
-            onClick={() => handleSave(true)}
-            isLoading={saveAndNextLoading}
-            disabled={saveLoading || saveAndNextLoading}
-          >
-            Save & Next
-          </Button>
+          <div className="sticky top-1 w-[330px] min-h-[300px]">
+            <div className="flex justify-between items-center gap-6 mb-4">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-base font-bold">Preview</h2>
+              </div>
+            </div>
+
+            <WidgetPreviewArea />
+          </div>
         </div>
       </div>
     </div>
