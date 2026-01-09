@@ -6,6 +6,7 @@ import {
   deleteRedeemCoupon,
   toggleCouponStatus,
   type RedeemCoupon,
+  updateSetupProgress,
 } from "@/utils/api";
 import { Button } from "@heroui/button";
 import type { Selection } from "@heroui/table";
@@ -17,6 +18,7 @@ import DeleteBulkCouponsModal from "./components/DeleteBulkCouponsModal";
 import FixedDiscountForm from "./components/FixedDiscountForm";
 import FreeProductForm from "./components/FreeProductForm";
 import FreeShippingForm from "./components/FreeShippingForm";
+import LoadingSkeleton from "./components/LoadingSkeleton";
 import PercentageDiscountForm from "./components/PercentageDiscountForm";
 import WaysModal from "./components/WaysRedeemModal";
 import WaysRedeemTable from "./components/WaysRedeemTable";
@@ -31,6 +33,7 @@ export default function WaysToRedeem() {
     updateCouponStatusLocally,
     hasUnsavedChanges,
     resetToOriginal,
+    channelId,
   } = useRedeemSettings();
   const [selectedForm, setSelectedForm] = useState<string | null>(null);
   const [editingCoupon, setEditingCoupon] = useState<RedeemCoupon | null>(null);
@@ -242,19 +245,6 @@ export default function WaysToRedeem() {
   const handleSave = async (isNext: boolean = false) => {
     // Use the appropriate loading state based on isNext
     const loadingSetter = isNext ? setSaveAndNextLoading : setSaveLoading;
-    
-    if (!hasUnsavedChanges) {
-      addToast({
-        title: "Info",
-        description: "No changes to save",
-        color: "default",
-      });
-      // If Save & Next but no changes, still navigate
-      if (isNext) {
-        window.location.href = '/setup/customise-widget';
-      }
-      return;
-    }
 
     loadingSetter(true);
 
@@ -272,32 +262,38 @@ export default function WaysToRedeem() {
         return coupon.coupon.active !== originalCoupon.coupon.active;
       });
 
-      if (changedCoupons.length === 0) {
-        addToast({
-          title: "Info",
-          description: "No changes to save",
-          color: "default",
+      // Save changed coupons if any
+      if (changedCoupons.length > 0) {
+        const savePromises = changedCoupons.map(async (coupon) => {
+          return toggleCouponStatus(coupon._id!, coupon.coupon!.active || false);
         });
-        loadingSetter(false);
-        // If Save & Next but no changes, still navigate
-        if (isNext) {
-          window.location.href = '/setup/customise-widget';
-        }
-        return;
+
+        await Promise.all(savePromises);
       }
 
-      // Save only changed coupons
-      const savePromises = changedCoupons.map(async (coupon) => {
-        return toggleCouponStatus(coupon._id!, coupon.coupon!.active || false);
-      });
+      // Update setup progress to 3 (only increases, never decreases)
+      if (channelId) {
+        try {
+          await updateSetupProgress(channelId, 3);
+        } catch (error) {
+          console.error("Error updating setup progress:", error);
+          // Don't fail the save if progress update fails
+        }
+      }
 
-      await Promise.all(savePromises);
-
-      addToast({
-        title: "Success",
-        description: `${changedCoupons.length} coupon(s) saved successfully`,
-        color: "success",
-      });
+      if (changedCoupons.length > 0) {
+        addToast({
+          title: "Success",
+          description: `${changedCoupons.length} coupon(s) saved successfully`,
+          color: "success",
+        });
+      } else {
+        addToast({
+          title: "Success",
+          description: "Settings saved successfully",
+          color: "success",
+        });
+      }
 
       // Refresh to get latest state from server
       await refreshRedeemSettings();
@@ -322,6 +318,11 @@ export default function WaysToRedeem() {
       }
     }
   };
+
+  // Show skeleton loading state
+  if (loading) {
+    return <LoadingSkeleton />;
+  }
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -407,11 +408,7 @@ export default function WaysToRedeem() {
                 </div>
 
                 <div className="p-4">
-                  {loading ? (
-                    <div className="flex flex-col gap-4 justify-center items-center py-8">
-                      <div className="text-sm text-gray-500">Loading...</div>
-                    </div>
-                  ) : hasCoupons ? (
+                  {hasCoupons ? (
                     <WaysRedeemTable
                       coupons={redeemCoupons}
                       onToggleCoupon={updateCouponStatusLocally}
@@ -456,7 +453,7 @@ export default function WaysToRedeem() {
                 className="custom-btn-default"
                 onClick={() => handleSave(false)}
                 isLoading={saveLoading}
-                disabled={!hasUnsavedChanges || saveLoading || saveAndNextLoading}
+                disabled={saveLoading || saveAndNextLoading}
               >
                 Save
               </Button>
@@ -464,7 +461,7 @@ export default function WaysToRedeem() {
                 className="custom-btn"
                 onClick={() => handleSave(true)}
                 isLoading={saveAndNextLoading}
-                disabled={!hasUnsavedChanges || saveLoading || saveAndNextLoading}
+                disabled={saveLoading || saveAndNextLoading}
               >
                 Save & Next
               </Button>

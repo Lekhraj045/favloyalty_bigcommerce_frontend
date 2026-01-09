@@ -78,6 +78,7 @@ export type Channel = {
   channel_type?: string | null;
   platform?: string | null;
   status?: string | null;
+  setupprogress?: number; // Setup progress (0-4)
 };
 
 export type LoginResponse = {
@@ -813,7 +814,11 @@ export interface WidgetCustomization {
   store_id?: string;
   channel_id?: string;
   widgetIconUrlId?: string | null;
+  widgetIconColor?: string | null;
   widgetBgColor?: string;
+  headingColor?: string;
+  LauncherType?: "IconOnly" | "LabelOnly" | "Icon&Label";
+  Label?: string | null;
   backgroundPatternEnabled?: boolean;
   widgetButton?: string;
   announcements?: Array<{
@@ -840,7 +845,11 @@ export interface CreateWidgetCustomizationData {
   storeId: string;
   channelId: string;
   widgetIconUrlId?: string | null;
+  widgetIconColor?: string | null;
   widgetBgColor?: string;
+  headingColor?: string;
+  LauncherType?: "IconOnly" | "LabelOnly" | "Icon&Label";
+  Label?: string | null;
   backgroundPatternEnabled?: boolean;
   widgetButton?: string;
   announcements?: Array<{
@@ -991,5 +1000,60 @@ export async function deleteWidgetCustomization(
 
   const result = await response.json();
   console.log("✅ Widget customization deleted successfully:", result);
+  return result;
+}
+
+// Setup Progress Functions
+export async function updateSetupProgress(
+  channelId: string,
+  progress: number
+): Promise<{ success: boolean; message: string; data?: any }> {
+  console.log("📤 Updating setup progress:", { channelId, progress });
+
+  const response = await fetch(`${API_URL}/api/channels/setup-progress`, {
+    method: "PATCH",
+    headers: getAuthHeaders(true),
+    body: JSON.stringify({
+      channelId,
+      progress,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error updating setup progress:", errorBody);
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to update setup progress"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Setup progress updated successfully:", result);
+  return result;
+}
+
+export async function getSetupProgress(channelId: string): Promise<{
+  success: boolean;
+  data?: { channelId: string; setupprogress: number };
+}> {
+  console.log("📥 Fetching setup progress:", { channelId });
+
+  const response = await fetch(
+    `${API_URL}/api/channels/setup-progress?channelId=${channelId}`,
+    {
+      headers: getAuthHeaders(),
+    }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error fetching setup progress:", errorBody);
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to fetch setup progress"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Setup progress fetched successfully:", result);
   return result;
 }

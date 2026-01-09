@@ -2,7 +2,7 @@
 
 import SetupHeader from "@/components/SetupHeader";
 import SetupNavigation from "@/components/SetupNavigation";
-import { saveCollectSettings } from "@/utils/api";
+import { saveCollectSettings, updateSetupProgress } from "@/utils/api";
 import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
 import { useEffect, useMemo, useState } from "react";
@@ -175,6 +175,15 @@ export default function WaysToEarn() {
       if (response && response.success) {
         // Update saved events state after successful save
         setSavedEvents(JSON.parse(JSON.stringify(settings.events)));
+        
+        // Update setup progress to 2 (only increases, never decreases)
+        try {
+          await updateSetupProgress(settings.channelId, 2);
+        } catch (error) {
+          console.error("Error updating setup progress:", error);
+          // Don't fail the save if progress update fails
+        }
+        
         addToast({
           title: "Success",
           description: "Settings saved successfully",

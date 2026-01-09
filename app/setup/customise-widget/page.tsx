@@ -2,22 +2,101 @@
 
 import SetupHeader from "@/components/SetupHeader";
 import SetupNavigation from "@/components/SetupNavigation";
+import { useAppSelector } from "@/store/hooks";
+import {
+  getStoreId,
+  getWidgetCustomization,
+  saveWidgetCustomization,
+  updateSetupProgress,
+} from "@/utils/api";
+import { Button } from "@heroui/button";
+import { addToast } from "@heroui/toast";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import AnnouncementsArea from "./components/Announcements";
 import BackgroundPatternArea from "./components/BackgroundPattern";
 import CustomiseWidgetArea from "./components/CustomiseWidget";
+import LoadingSkeleton from "./components/LoadingSkeleton";
 import WidgetIconArea from "./components/WidgetIcon";
 import WidgetPreviewArea from "./components/WidgetPreview";
+import {
+  WidgetCustomizationProvider,
+  useWidgetCustomization,
+} from "./context/WidgetCustomizationContext";
 
-export default function CustomiseWidget() {
+function CustomiseWidgetContent() {
   const router = useRouter();
   const selectedChannel = useAppSelector(
     (state) => state.channel.selectedChannel
   );
   const storeId = getStoreId();
   const channelId = selectedChannel?.id || "";
+  const { state, loadData } = useWidgetCustomization();
 
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveAndNextLoading, setSaveAndNextLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Load existing widget customization data on mount (only once when storeId/channelId changes)
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadWidgetData = async () => {
+      if (!storeId || !channelId) {
+        if (isMounted) {
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const data = await getWidgetCustomization(storeId, channelId);
+        if (isMounted && data) {
+          loadData(data);
+        }
+      } catch (error: any) {
+        console.error("Error loading widget customization:", error);
+        // Don't show error toast, just use defaults
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadWidgetData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [storeId, channelId]); // Removed loadData from dependencies
+
+  // Map launcher type from frontend format to backend format
+  const mapLauncherType = (
+    launcher: string
+  ): "IconOnly" | "LabelOnly" | "Icon&Label" => {
+    switch (launcher) {
+      case "icon-only":
+        return "IconOnly";
+      case "label-only":
+        return "LabelOnly";
+      case "icon-label":
+        return "Icon&Label";
+      default:
+        return "IconOnly";
+    }
+  };
+
+  // Map widget button position from frontend format to backend format
+  const mapWidgetButton = (alignment: string): string => {
+    const mapping: Record<string, string> = {
+      "bottom-left": "Bottom-Left",
+      "bottom-right": "Bottom-Right",
+      "top-left": "Top-Left",
+      "top-right": "Top-Right",
+    };
+    return mapping[alignment] || "Bottom-Left";
+  };
 
   // Handle save
   const handleSave = async (isNext: boolean = false) => {
@@ -36,16 +115,36 @@ export default function CustomiseWidget() {
     loadingSetter(true);
 
     try {
-      // Prepare widget customization data
-      // TODO: Replace with actual form data when widget customization form is implemented
+      // Prepare widget customization data from context state
+      // Remove temporary _id from announcements before sending to backend
+      const cleanedAnnouncements = state.announcements.map(
+        ({ _id, ...announcement }) => ({
+          enable: announcement.enable,
+          image: announcement.image,
+          link: announcement.link,
+        })
+      );
+
       const widgetData = {
-        widgetIconUrlId: null,
-        widgetBgColor: "#62a63f",
-        backgroundPatternEnabled: false,
-        widgetButton: "Bottom-Left",
-        announcements: [],
-        displayOption: [],
-        backgroundPatternUrlId: null,
+        widgetIconUrlId: state.selectedWidgetIcon || null,
+        widgetIconColor: state.widgetIconColor,
+        widgetBgColor: state.widgetBgColor,
+        headingColor: state.headingColor,
+        LauncherType: mapLauncherType(state.selectedLauncher),
+        Label:
+          state.selectedLauncher === "label-only" ||
+          state.selectedLauncher === "icon-label"
+            ? state.label
+            : null,
+        backgroundPatternEnabled:
+          state.selectedPattern !== "none" && state.selectedPattern !== null,
+        widgetButton: mapWidgetButton(state.widgetButton),
+        announcements: cleanedAnnouncements,
+        displayOption: state.displayOption,
+        backgroundPatternUrlId:
+          state.selectedPattern && state.selectedPattern !== "none"
+            ? state.selectedPattern
+            : null,
       };
 
       const response = await saveWidgetCustomization(
@@ -61,6 +160,25 @@ export default function CustomiseWidget() {
         response && (response.success === true || response.data);
 
       if (isSuccess) {
+        // Update setup progress to 4 (only increases, never decreases)
+        try {
+          await updateSetupProgress(channelId, 4);
+        } catch (error) {
+          console.error("Error updating setup progress:", error);
+          // Don't fail the save if progress update fails
+        }
+
+        // Reload data from backend to get updated _id fields and ensure sync
+        try {
+          const updatedData = await getWidgetCustomization(storeId, channelId);
+          if (updatedData) {
+            loadData(updatedData);
+          }
+        } catch (error) {
+          console.error("Error reloading widget customization:", error);
+          // Don't fail the save if reload fails
+        }
+
         addToast({
           title: "Success",
           description:
@@ -99,6 +217,10 @@ export default function CustomiseWidget() {
     }
   };
 
+  if (loading) {
+    return <LoadingSkeleton />;
+  }
+
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-col gap-4">
@@ -136,7 +258,37 @@ export default function CustomiseWidget() {
             <WidgetPreviewArea />
           </div>
         </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3 justify-end mt-4">
+          <Button
+            color="primary"
+            variant="flat"
+            className="custom-btn-default"
+            onClick={() => handleSave(false)}
+            isLoading={saveLoading}
+            disabled={saveLoading || saveAndNextLoading}
+          >
+            Save
+          </Button>
+          <Button
+            className="custom-btn"
+            onClick={() => handleSave(true)}
+            isLoading={saveAndNextLoading}
+            disabled={saveLoading || saveAndNextLoading}
+          >
+            Save & Next
+          </Button>
+        </div>
       </div>
     </div>
+  );
+}
+
+export default function CustomiseWidget() {
+  return (
+    <WidgetCustomizationProvider>
+      <CustomiseWidgetContent />
+    </WidgetCustomizationProvider>
   );
 }

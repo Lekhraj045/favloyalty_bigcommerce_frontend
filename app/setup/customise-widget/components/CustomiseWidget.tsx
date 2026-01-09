@@ -1,11 +1,10 @@
-import { useState } from "react";
 import { HexColorPicker, HexColorInput } from "react-colorful";
 import ColorPickerField from "./ColorPickerField";
+import { useWidgetCustomization } from "../context/WidgetCustomizationContext";
 
 export default function CustomiseWidgetArea() {
-  const [widgetColor, setWidgetColor] = useState("#047b5d");
-  const [headingColor, setHeadingColor] = useState("#ffffff");
-  const [widgetIconColor, setWidgetIconColor] = useState("#ffffff");
+  const { state, updateState } = useWidgetCustomization();
+  
   return (
     <>
       <div className="card">
@@ -18,20 +17,20 @@ export default function CustomiseWidgetArea() {
           <div className="flex gap-8">
             <ColorPickerField
               label="Widget Color"
-              value={widgetColor}
-              onChange={setWidgetColor}
+              value={state.widgetBgColor}
+              onChange={(color) => updateState({ widgetBgColor: color })}
             />
 
             <ColorPickerField
               label="Heading Text Color"
-              value={headingColor}
-              onChange={setHeadingColor}
+              value={state.headingColor}
+              onChange={(color) => updateState({ headingColor: color })}
             />
 
             <ColorPickerField
               label="Widget Icon Color"
-              value={widgetIconColor}
-              onChange={setWidgetIconColor}
+              value={state.widgetIconColor || "#ffffff"}
+              onChange={(color) => updateState({ widgetIconColor: color })}
             />
           </div>
         </div>

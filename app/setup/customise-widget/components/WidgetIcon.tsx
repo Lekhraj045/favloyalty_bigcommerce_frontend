@@ -1,16 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { Gift, Check } from "lucide-react";
 import Image from "next/image";
 import ColorPickerField from "./ColorPickerField";
+import { useWidgetCustomization } from "../context/WidgetCustomizationContext";
 
 export default function WidgetIconArea() {
-  const [selectedLauncher, setSelectedLauncher] = useState<string>("icon-only");
-  const [selectedWidgetIcon, setSelectedWidgetIcon] =
-    useState<string>("widget-icon1");
-  const [selectedAlignment, setSelectedAlignment] =
-    useState<string>("bottom-right");
+  const { state, updateState } = useWidgetCustomization();
+  const selectedLauncher = state.selectedLauncher;
+  const selectedWidgetIcon = state.selectedWidgetIcon;
+  const selectedAlignment = state.widgetButton;
 
   const launchers = [
     {
@@ -57,7 +57,7 @@ export default function WidgetIconArea() {
                           ? "border-2 border-[#392D5D] shadow-xs"
                           : "border-[#DEDEDE] hover:border-[#D4D1D1] hover:shadow-xs"
                       }`}
-                      onClick={() => setSelectedLauncher(launcher.id)}
+                      onClick={() => updateState({ selectedLauncher: launcher.id })}
                     >
                       {launcher.id === "icon-only" && (
                         <div
@@ -128,7 +128,7 @@ export default function WidgetIconArea() {
                     <div
                       key={iconId}
                       className={`w-[60px] h-[60px] rounded-full bg-[#055a45] flex items-center justify-center relative cursor-pointer transition-colors `}
-                      onClick={() => setSelectedWidgetIcon(iconId)}
+                      onClick={() => updateState({ selectedWidgetIcon: iconId })}
                     >
                       <Image
                         src={`${process.env.NEXT_PUBLIC_BASE_PATH}/images/${iconId}.svg`}
@@ -161,13 +161,23 @@ export default function WidgetIconArea() {
             <div className="flex flex-col gap-1">
               <div className="flex flex-col gap-1">
                 <h2 className="text-[13px] font-bold">Label</h2>
+                <p className="text-xs text-[#616161]">
+                  {state.label.length}/10 characters (letters and numbers only)
+                </p>
               </div>
 
               <div className="">
                 <input
                   type="text"
-                  value={"Reward"}
+                  value={state.label}
+                  maxLength={10}
+                  onChange={(e) => {
+                    // Only allow alphanumeric characters (letters and numbers)
+                    const filteredValue = e.target.value.replace(/[^a-zA-Z0-9]/g, "");
+                    updateState({ label: filteredValue });
+                  }}
                   className="w-full h-8 border border-[#8a8a8a] rounded-lg px-3 text-[13px] leading-none focus:outline-none bg-[#fdfdfd]"
+                  placeholder="Enter label"
                 />
               </div>
             </div>
@@ -183,7 +193,7 @@ export default function WidgetIconArea() {
             <div className="flex gap-4">
               <div
                 className="flex flex-col gap-2 items-center cursor-pointer relative"
-                onClick={() => setSelectedAlignment("bottom-left")}
+                onClick={() => updateState({ widgetButton: "bottom-left" })}
               >
                 <div
                   className={`w-[90px] h-[60px] rounded-lg bg-white relative ${
@@ -213,7 +223,7 @@ export default function WidgetIconArea() {
 
               <div
                 className="flex flex-col gap-2 items-center cursor-pointer relative"
-                onClick={() => setSelectedAlignment("bottom-right")}
+                onClick={() => updateState({ widgetButton: "bottom-right" })}
               >
                 <div
                   className={`w-[90px] h-[60px] rounded-lg bg-white relative ${

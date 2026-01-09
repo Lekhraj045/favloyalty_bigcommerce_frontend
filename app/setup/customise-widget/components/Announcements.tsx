@@ -1,9 +1,11 @@
 import { Button } from "@heroui/button";
-import React from "react";
+import React, { useState } from "react";
 import AnnouncementsTableArea from "./AnnouncementsTable";
 import AnnouncementsModalArea from "./AnnouncementsModal";
 
 export default function AnnouncementsArea() {
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
   return (
     <>
       <div className="card !p-0">
@@ -14,10 +16,13 @@ export default function AnnouncementsArea() {
               <p>Select the options you want to display as announcements</p>
             </div>
 
-            <AnnouncementsModalArea />
+            <AnnouncementsModalArea
+              editingIndex={editingIndex}
+              onCloseEdit={() => setEditingIndex(null)}
+            />
           </div>
 
-          <AnnouncementsTableArea />
+          <AnnouncementsTableArea onEdit={(index) => setEditingIndex(index)} />
         </div>
       </div>
     </>

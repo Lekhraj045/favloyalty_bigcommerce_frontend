@@ -1,16 +1,29 @@
 'use client'
 
 import { useDropzone, FileRejection } from 'react-dropzone'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 type PreviewFile = {
   file: File
   preview: string
 }
 
-export default function AnnouncementsUploadArea() {
+interface AnnouncementsUploadAreaProps {
+  onImageSelect?: (file: File, preview: string) => void;
+  initialPreview?: string | null;
+}
+
+export default function AnnouncementsUploadArea({ onImageSelect, initialPreview }: AnnouncementsUploadAreaProps) {
   const [files, setFiles] = useState<PreviewFile[]>([])
   const [error, setError] = useState<string | null>(null)
+
+  // Set initial preview if provided
+  useEffect(() => {
+    if (initialPreview && files.length === 0) {
+      // If there's an initial preview but no files, we'll show it in the preview section
+      // but we don't need to add it to files array since it's not a File object
+    }
+  }, [initialPreview, files.length])
 
   const onDropAccepted = (acceptedFiles: File[]) => {
     setError(null)
@@ -21,7 +34,19 @@ export default function AnnouncementsUploadArea() {
     }))
 
     setFiles(mapped)
+    
+    // Call callback with first file
+    if (mapped.length > 0 && onImageSelect) {
+      onImageSelect(mapped[0].file, mapped[0].preview);
+    }
   }
+
+  // Cleanup preview URLs
+  useEffect(() => {
+    return () => {
+      files.forEach(({ preview }) => URL.revokeObjectURL(preview))
+    }
+  }, [files])
 
   const onDropRejected = (fileRejections: FileRejection[]) => {
     const rejection = fileRejections[0]
@@ -85,27 +110,32 @@ export default function AnnouncementsUploadArea() {
       )}
 
       {/* ✅ Preview */}
-      {files.map(({ file, preview }) => (
-        <div
-          key={file.name}
-          className="border border-[#DEDEDE] rounded-xl p-3 flex items-center gap-3"
-        >
+      {(files.length > 0 || initialPreview) && (
+        <div className="border border-[#DEDEDE] rounded-xl p-3 flex items-center gap-3">
           <img
-            src={preview}
-            alt={file.name}
+            src={files.length > 0 ? files[0].preview : initialPreview || ''}
+            alt={files.length > 0 ? files[0].file.name : "Current image"}
             className="w-12 h-12 rounded-md border border-[#DEDEDE] object-cover shadow-sm"
           />
 
           <div className="flex-1">
-            <p className="text-sm text-[#616161] truncate max-w-[300px]">
-              {file.name}
-            </p>
-            <p className="text-xs text-gray-500">
-              {(file.size / 1024 / 1024).toFixed(1)} MB
-            </p>
+            {files.length > 0 ? (
+              <>
+                <p className="text-sm text-[#616161] truncate max-w-[300px]">
+                  {files[0].file.name}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {(files[0].file.size / 1024 / 1024).toFixed(1)} MB
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-[#616161] truncate max-w-[300px]">
+                Current image
+              </p>
+            )}
           </div>
         </div>
-      ))}
+      )}
     </div>
   )
 }

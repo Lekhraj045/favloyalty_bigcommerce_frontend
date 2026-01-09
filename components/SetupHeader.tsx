@@ -1,9 +1,47 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import ChannelSelector from "@/components/ChannelSelector";
 import { Button } from "@heroui/button";
+import { Skeleton } from "@heroui/skeleton";
+import { useAppSelector } from "@/store/hooks";
+import { getSetupProgress } from "@/utils/api";
 
 export default function SetupHeader() {
+  const selectedChannel = useAppSelector(
+    (state) => state.channel.selectedChannel
+  );
+  const [setupProgress, setSetupProgress] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Fetch setup progress when channel changes
+  useEffect(() => {
+    const fetchProgress = async () => {
+      if (!selectedChannel?.id) {
+        setSetupProgress(0);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const result = await getSetupProgress(selectedChannel.id);
+        if (result.success && result.data) {
+          setSetupProgress(result.data.setupprogress || 0);
+        } else {
+          setSetupProgress(0);
+        }
+      } catch (error) {
+        console.error("Error fetching setup progress:", error);
+        setSetupProgress(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProgress();
+  }, [selectedChannel?.id]);
+
   return (
     <div className="flex gap-2 justify-between items-center">
       <div className="flex flex-col gap-1">
@@ -14,11 +52,14 @@ export default function SetupHeader() {
       <div className="flex gap-2.5 items-center">
         <ChannelSelector />
         <div className="relative">
-          {(() => {
-            // Dynamic progress calculation
-            const completed = 4; // Update this based on your app state 1, 2, 3, 4
-            const total = 4;
-            const progress = Math.round((completed / total) * 100);
+          {loading ? (
+            <Skeleton className="h-7 w-32 rounded-full" />
+          ) : (
+            (() => {
+              // Dynamic progress calculation
+              const completed = setupProgress;
+              const total = 4;
+              const progress = Math.round((completed / total) * 100);
 
             // Color configuration based on progress
             const getProgressColors = (val: number) => {
@@ -143,7 +184,8 @@ export default function SetupHeader() {
                 )}
               </span>
             );
-          })()}
+            })()
+          )}
         </div>
         <Button className="custom-btn">Upgrade</Button>
       </div>

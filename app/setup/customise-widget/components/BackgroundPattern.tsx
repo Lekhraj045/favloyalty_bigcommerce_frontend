@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Image from "next/image";
 import { CircleSlash2, Check } from "lucide-react";
+import { useWidgetCustomization } from "../context/WidgetCustomizationContext";
 
 export default function BackgroundPatternArea() {
-  const [selectedPattern, setSelectedPattern] = useState<string | null>("none");
+  const { state, updateState } = useWidgetCustomization();
+  const selectedPattern = state.selectedPattern;
 
   const patterns = [
     { id: "none", component: <CircleSlash2 />, image: undefined, alt: undefined },
@@ -33,7 +35,7 @@ export default function BackgroundPatternArea() {
                     ? "border-2 border-[#392D5D] shadow-xs"
                     : "border-[#DEDEDE] hover:border-[#D4D1D1] hover:shadow-xs"
                 }`}
-                onClick={() => setSelectedPattern(pattern.id)}
+                onClick={() => updateState({ selectedPattern: pattern.id })}
               >
                 {pattern.component ? (
                   <div className="w-full h-full flex items-center justify-center">

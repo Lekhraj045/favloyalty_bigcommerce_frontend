@@ -1,8 +1,8 @@
 "use client";
 
-import { useAppSelector, useAppDispatch } from "@/store/hooks";
-import { store } from "@/store/store";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { setPointsData } from "@/store/slices/pointsSlice";
+import { store } from "@/store/store";
 import {
   CustomPointName,
   getPoints,
@@ -12,6 +12,7 @@ import {
   savePoints,
   Tier,
   updatePoints,
+  updateSetupProgress,
 } from "@/utils/api";
 import { Button } from "@heroui/button";
 import { Skeleton } from "@heroui/skeleton";
@@ -35,7 +36,7 @@ interface ValidationErrors {
 
 export default function PointsSetting() {
   const router = useRouter();
-  
+
   // Form state
   const [pointName, setPointName] = useState<string>("Points");
   const [selectedPointNameOption, setSelectedPointNameOption] =
@@ -150,12 +151,12 @@ export default function PointsSetting() {
           setExpiriesInDays(data.expiriesInDays || 1);
           setTierStatus(data.tierStatus);
           const tiersToSet = data.tier || [
-              { tierName: "Silver", pointRequired: 0, multiplier: 1 },
-              { tierName: "Gold", pointRequired: 1000, multiplier: 1.2 },
-              { tierName: "Platinum", pointRequired: 5000, multiplier: 1.5 },
+            { tierName: "Silver", pointRequired: 0, multiplier: 1 },
+            { tierName: "Gold", pointRequired: 1000, multiplier: 1.2 },
+            { tierName: "Platinum", pointRequired: 5000, multiplier: 1.5 },
           ];
           setTiers(tiersToSet);
-          
+
           // Save to Redux store (only save tiers if tier system is enabled)
           dispatch(
             setPointsData({
@@ -542,6 +543,14 @@ export default function PointsSetting() {
           promise: new Promise((resolve) => setTimeout(resolve, 1000)),
         });
 
+        // Update setup progress to 1 (only increases, never decreases)
+        try {
+          await updateSetupProgress(currentChannelId, 1);
+        } catch (error) {
+          console.error("Error updating setup progress:", error);
+          // Don't fail the save if progress update fails
+        }
+
         // Save tiers to Redux store
         dispatch(
           setPointsData({
@@ -590,7 +599,7 @@ export default function PointsSetting() {
   const handleSaveAndNext = useCallback(async () => {
     await performSave(setSaveAndNextLoading);
     // Navigate to next step: Ways to Earn
-    window.location.href = '/setup/ways-to-earn';
+    window.location.href = "/setup/ways-to-earn";
   }, [performSave]);
 
   // Show message if no channel is selected
