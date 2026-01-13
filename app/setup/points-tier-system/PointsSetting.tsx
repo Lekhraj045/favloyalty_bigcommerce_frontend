@@ -1,6 +1,7 @@
 "use client";
 
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { updateChannelCompletionStatus } from "@/store/slices/channelSlice";
 import { setPointsData } from "@/store/slices/pointsSlice";
 import { store } from "@/store/store";
 import {
@@ -11,6 +12,7 @@ import {
   PointData,
   savePoints,
   Tier,
+  updatePageCompletionStatus,
   updatePoints,
   updateSetupProgress,
 } from "@/utils/api";
@@ -551,6 +553,35 @@ export default function PointsSetting() {
           // Don't fail the save if progress update fails
         }
 
+        // Check if page is completed: pointName is selected AND logo is selected
+        const isPageCompleted: boolean = !!(
+          pointName &&
+          pointName.trim() !== "" &&
+          (logoDetails !== null || customLogo !== null)
+        );
+
+        // Update page completion status
+        if (currentChannelId) {
+          try {
+            await updatePageCompletionStatus(
+              currentChannelId,
+              "pointsTierSystem",
+              isPageCompleted
+            );
+            // Update Redux store to reflect the new completion status
+            dispatch(
+              updateChannelCompletionStatus({
+                channelId: currentChannelId,
+                pageType: "pointsTierSystem",
+                completed: isPageCompleted,
+              })
+            );
+          } catch (error) {
+            console.error("Error updating page completion status:", error);
+            // Don't fail the save if completion status update fails
+          }
+        }
+
         // Save tiers to Redux store
         dispatch(
           setPointsData({
@@ -598,9 +629,9 @@ export default function PointsSetting() {
   // Save and Next function
   const handleSaveAndNext = useCallback(async () => {
     await performSave(setSaveAndNextLoading);
-    // Navigate to next step: Ways to Earn
-    window.location.href = "/setup/ways-to-earn";
-  }, [performSave]);
+    // Navigate to next step: Ways to Earn (using router to preserve Redux state)
+    router.push("/setup/ways-to-earn");
+  }, [performSave, router]);
 
   // Show message if no channel is selected
   if (!selectedChannel) {

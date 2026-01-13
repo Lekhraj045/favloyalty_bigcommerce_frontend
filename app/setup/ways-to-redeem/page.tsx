@@ -2,17 +2,21 @@
 
 import SetupHeader from "@/components/SetupHeader";
 import SetupNavigation from "@/components/SetupNavigation";
+import { useAppDispatch } from "@/store/hooks";
+import { updateChannelCompletionStatus } from "@/store/slices/channelSlice";
 import {
   deleteRedeemCoupon,
   toggleCouponStatus,
-  type RedeemCoupon,
+  updatePageCompletionStatus,
   updateSetupProgress,
+  type RedeemCoupon,
 } from "@/utils/api";
 import { Button } from "@heroui/button";
 import type { Selection } from "@heroui/table";
 import { addToast } from "@heroui/toast";
 import { Trash2 } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import DeleteBulkCouponsModal from "./components/DeleteBulkCouponsModal";
 import FixedDiscountForm from "./components/FixedDiscountForm";
@@ -25,6 +29,8 @@ import WaysRedeemTable from "./components/WaysRedeemTable";
 import { useRedeemSettings } from "./hooks";
 
 export default function WaysToRedeem() {
+  const router = useRouter();
+  const dispatch = useAppDispatch();
   const {
     redeemCoupons,
     originalCoupons,
@@ -265,7 +271,10 @@ export default function WaysToRedeem() {
       // Save changed coupons if any
       if (changedCoupons.length > 0) {
         const savePromises = changedCoupons.map(async (coupon) => {
-          return toggleCouponStatus(coupon._id!, coupon.coupon!.active || false);
+          return toggleCouponStatus(
+            coupon._id!,
+            coupon.coupon!.active || false
+          );
         });
 
         await Promise.all(savePromises);
@@ -278,6 +287,31 @@ export default function WaysToRedeem() {
         } catch (error) {
           console.error("Error updating setup progress:", error);
           // Don't fail the save if progress update fails
+        }
+
+        // Check if page is completed: at least one coupon exists
+        const isPageCompleted = redeemCoupons.length > 0;
+
+        // Update page completion status
+        if (channelId) {
+          try {
+            await updatePageCompletionStatus(
+              channelId,
+              "waysToRedeem",
+              isPageCompleted
+            );
+            // Update Redux store to reflect the new completion status
+            dispatch(
+              updateChannelCompletionStatus({
+                channelId: channelId,
+                pageType: "waysToRedeem",
+                completed: isPageCompleted,
+              })
+            );
+          } catch (error) {
+            console.error("Error updating page completion status:", error);
+            // Don't fail the save if completion status update fails
+          }
         }
       }
 
@@ -298,10 +332,10 @@ export default function WaysToRedeem() {
       // Refresh to get latest state from server
       await refreshRedeemSettings();
 
-      // If Save & Next, navigate to next step: Customise Widget
+      // If Save & Next, navigate to next step: Customise Widget (using router to preserve Redux state)
       if (isNext) {
         loadingSetter(false);
-        window.location.href = '/setup/customise-widget';
+        router.push("/setup/customise-widget");
         return;
       }
     } catch (error: any) {

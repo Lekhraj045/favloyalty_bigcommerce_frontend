@@ -2,6 +2,9 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { CircleCheck, Scan } from "lucide-react";
+import { useAppSelector } from "@/store/hooks";
+import { useEffect, useState } from "react";
+import type { Channel } from "@/utils/api";
 
 interface SetupNavigationProps {
   onNavigate?: (route: string) => void;
@@ -10,6 +13,48 @@ interface SetupNavigationProps {
 export default function SetupNavigation({ onNavigate }: SetupNavigationProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const reduxSelectedChannel = useAppSelector(
+    (state) => state.channel.selectedChannel
+  );
+  
+  // Initialize from localStorage immediately (synchronous) to avoid delay on page reload
+  const getInitialChannel = (): Channel | null => {
+    if (typeof window === "undefined") return null;
+    // First try Redux state if available
+    if (reduxSelectedChannel) return reduxSelectedChannel;
+    // Fallback to localStorage (synchronous read)
+    const stored = localStorage.getItem("redux_selected_channel");
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(
+    getInitialChannel
+  );
+
+  useEffect(() => {
+    // Update when Redux state changes
+    if (reduxSelectedChannel) {
+      setSelectedChannel(reduxSelectedChannel);
+    } else {
+      // Fallback to localStorage if Redux state is cleared
+      const stored = localStorage.getItem("redux_selected_channel");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setSelectedChannel(parsed);
+        } catch (e) {
+          console.error("Error parsing stored channel:", e);
+        }
+      }
+    }
+  }, [reduxSelectedChannel]);
 
   const handleNavigation = (route: string) => {
     if (onNavigate) {
@@ -22,22 +67,22 @@ export default function SetupNavigation({ onNavigate }: SetupNavigationProps) {
   const steps = [
     {
       label: "Points & Tier System",
-      completed: true,
+      completed: selectedChannel?.pointsTierSystemCompleted || false,
       route: "/setup/points-tier-system",
     },
     {
       label: "Ways to Earn",
-      completed: false,
+      completed: selectedChannel?.waysToEarnCompleted || false,
       route: "/setup/ways-to-earn",
     },
     {
       label: "Ways to Redeem",
-      completed: false,
+      completed: selectedChannel?.waysToRedeemCompleted || false,
       route: "/setup/ways-to-redeem",
     },
     {
       label: "Customise Widget",
-      completed: false,
+      completed: selectedChannel?.customiseWidgetCompleted || false,
       route: "/setup/customise-widget",
     },
   ];

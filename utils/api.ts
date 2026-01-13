@@ -1,6 +1,9 @@
 const API_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || "https://favbigcommerce.share.zrok.io";
 
+// Token expiration buffer (refresh 2 minutes before expiration)
+const TOKEN_REFRESH_BUFFER_MS = 2 * 60 * 1000; // 2 minutes
+
 // Helper function to get auth token
 const getAuthToken = (): string | null => {
   if (typeof window === "undefined") return null;
@@ -9,6 +12,97 @@ const getAuthToken = (): string | null => {
     localStorage.getItem("sessionToken") ||
     null
   );
+};
+
+// Helper function to get store hash from localStorage
+const getStoreHash = (): string | null => {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("bc_store_hash");
+};
+
+// Helper function to check if token is expired or about to expire
+const isTokenExpiredOrExpiringSoon = (): boolean => {
+  if (typeof window === "undefined") return true;
+
+  const expiresAt = localStorage.getItem("bc_session_expires_at");
+  if (!expiresAt) return true;
+
+  const expirationTime = parseInt(expiresAt, 10);
+  const now = Date.now();
+  const timeUntilExpiration = expirationTime - now;
+
+  // Return true if expired or will expire within the buffer time
+  return timeUntilExpiration <= TOKEN_REFRESH_BUFFER_MS;
+};
+
+// Helper function to refresh the session token
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
+
+const refreshSessionToken = async (): Promise<string | null> => {
+  // If already refreshing, return the existing promise
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const storeHash = getStoreHash();
+      if (!storeHash) {
+        console.error("❌ Cannot refresh token: store hash not found");
+        return null;
+      }
+
+      console.log("🔄 Refreshing session token...");
+      const response = await fetch(`${API_URL}/auth/refresh-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeHash }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        console.error("❌ Error refreshing token:", errorBody);
+        throw new Error(
+          errorBody.message || errorBody.error || "Failed to refresh token"
+        );
+      }
+
+      const result = await response.json();
+      const { sessionToken, sessionExpiresAt } = result;
+
+      // Update localStorage with new token
+      localStorage.setItem("bc_session_token", sessionToken);
+      localStorage.setItem(
+        "bc_session_expires_at",
+        sessionExpiresAt.toString()
+      );
+
+      console.log("✅ Session token refreshed successfully");
+      return sessionToken;
+    } catch (error) {
+      console.error("❌ Token refresh failed:", error);
+      // Clear expired token on refresh failure
+      localStorage.removeItem("bc_session_token");
+      localStorage.removeItem("bc_session_expires_at");
+      return null;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+};
+
+// Helper function to ensure token is valid before making API calls
+const ensureValidToken = async (): Promise<boolean> => {
+  if (isTokenExpiredOrExpiringSoon()) {
+    const newToken = await refreshSessionToken();
+    return newToken !== null;
+  }
+  return true;
 };
 
 // Helper function to build auth headers
@@ -28,6 +122,62 @@ const getAuthHeaders = (includeContentType = false): HeadersInit => {
   return headers;
 };
 
+// Enhanced fetch wrapper that handles token refresh and retry
+const fetchWithAuth = async (
+  url: string,
+  options: RequestInit = {},
+  retryCount = 0
+): Promise<Response> => {
+  const maxRetries = 1;
+
+  // Ensure token is valid before making the request
+  await ensureValidToken();
+
+  // Build headers - preserve existing headers but add auth
+  const headers = new Headers(options.headers);
+  const authHeaders = getAuthHeaders(
+    options.body instanceof FormData ? false : true
+  );
+  Object.entries(authHeaders).forEach(([key, value]) => {
+    if (value) {
+      headers.set(key, value as string);
+    }
+  });
+
+  // Make the request with current token
+  let response = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  // If we get a 401, try refreshing the token and retry once
+  if (response.status === 401 && retryCount < maxRetries) {
+    console.log("🔄 Received 401, refreshing token and retrying...");
+    const newToken = await refreshSessionToken();
+
+    if (newToken) {
+      // Update auth headers with new token
+      const newAuthHeaders = getAuthHeaders(
+        options.body instanceof FormData ? false : true
+      );
+      const retryHeaders = new Headers(options.headers);
+      Object.entries(newAuthHeaders).forEach(([key, value]) => {
+        if (value) {
+          retryHeaders.set(key, value as string);
+        }
+      });
+
+      // Retry the request with the new token
+      response = await fetch(url, {
+        ...options,
+        headers: retryHeaders,
+      });
+    }
+  }
+
+  return response;
+};
+
 export async function getStoreInfo(storeHash: string) {
   const response = await fetch(`${API_URL}/api/store/${storeHash}`);
   if (!response.ok) throw new Error("Failed to fetch store");
@@ -44,9 +194,12 @@ export function getStoreId(): string | null {
 export async function getChannels(storeId: string): Promise<Channel[]> {
   console.log("📥 Fetching channels for store:", storeId);
 
-  const response = await fetch(`${API_URL}/api/channels?storeId=${storeId}`, {
-    headers: getAuthHeaders(),
-  });
+  const response = await fetchWithAuth(
+    `${API_URL}/api/channels?storeId=${storeId}`,
+    {
+      method: "GET",
+    }
+  );
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
@@ -79,6 +232,10 @@ export type Channel = {
   platform?: string | null;
   status?: string | null;
   setupprogress?: number; // Setup progress (0-4)
+  pointsTierSystemCompleted?: boolean;
+  waysToEarnCompleted?: boolean;
+  waysToRedeemCompleted?: boolean;
+  customiseWidgetCompleted?: boolean;
 };
 
 export type LoginResponse = {
@@ -203,9 +360,8 @@ export async function savePoints(
 
   console.log("📤 Saving points:", { storeId, channelId, pointData });
 
-  const response = await fetch(`${API_URL}/api/points`, {
+  const response = await fetchWithAuth(`${API_URL}/api/points`, {
     method: "POST",
-    headers: getAuthHeaders(),
     body: formData,
   });
 
@@ -262,9 +418,8 @@ export async function updatePoints(
 
   console.log("📤 Updating points:", { pointId, pointData });
 
-  const response = await fetch(`${API_URL}/api/points/${pointId}`, {
+  const response = await fetchWithAuth(`${API_URL}/api/points/${pointId}`, {
     method: "PUT",
-    headers: getAuthHeaders(),
     body: formData,
   });
 
@@ -287,10 +442,10 @@ export async function getPoints(
 ): Promise<PointData | null> {
   console.log("📥 Fetching points:", { storeId, channelId });
 
-  const response = await fetch(
+  const response = await fetchWithAuth(
     `${API_URL}/api/points?storeId=${storeId}&channelId=${channelId}`,
     {
-      headers: getAuthHeaders(),
+      method: "GET",
     }
   );
 
@@ -358,9 +513,9 @@ export async function saveCollectSettings(
     settingsData,
   });
 
-  const response = await fetch(`${API_URL}/api/collect-settings`, {
+  const response = await fetchWithAuth(`${API_URL}/api/collect-settings`, {
     method: "POST",
-    headers: getAuthHeaders(true),
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       storeId,
       channelId,
@@ -387,10 +542,10 @@ export async function getCollectSettings(
 ): Promise<CollectSettingsData | null> {
   console.log("📥 Fetching collect settings:", { storeId, channelId });
 
-  const response = await fetch(
+  const response = await fetchWithAuth(
     `${API_URL}/api/collect-settings?storeId=${storeId}&channelId=${channelId}`,
     {
-      headers: getAuthHeaders(),
+      method: "GET",
     }
   );
 
@@ -504,10 +659,10 @@ export async function getRedeemSettings(
 ): Promise<RedeemCoupon[]> {
   console.log("📥 Fetching redeem settings:", { storeId, channelId });
 
-  const response = await fetch(
+  const response = await fetchWithAuth(
     `${API_URL}/api/redeem-settings?storeId=${storeId}&channelId=${channelId}`,
     {
-      headers: getAuthHeaders(),
+      method: "GET",
     }
   );
 
@@ -589,9 +744,9 @@ export async function createRedeemCoupon(
 ): Promise<{ success: boolean; message: string; data?: any }> {
   console.log("📤 Creating redeem coupon:", { storeId, channelId, couponData });
 
-  const response = await fetch(`${API_URL}/api/redeem-settings`, {
+  const response = await fetchWithAuth(`${API_URL}/api/redeem-settings`, {
     method: "POST",
-    headers: getAuthHeaders(true),
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       storeId,
       channelId,
@@ -625,9 +780,9 @@ export async function updateRedeemCoupon(
     couponData,
   });
 
-  const response = await fetch(`${API_URL}/api/redeem-settings`, {
+  const response = await fetchWithAuth(`${API_URL}/api/redeem-settings`, {
     method: "PUT",
-    headers: getAuthHeaders(true),
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       couponId,
       storeId,
@@ -656,11 +811,11 @@ export async function toggleCouponStatus(
   console.log("📤 Toggling coupon status:", { couponId, active });
 
   try {
-    const response = await fetch(
+    const response = await fetchWithAuth(
       `${API_URL}/api/redeem-settings/toggle-status`,
       {
         method: "PATCH",
-        headers: getAuthHeaders(true),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           couponId,
           active,
@@ -699,9 +854,9 @@ export async function deleteRedeemCoupon(
   console.log("📤 Deleting redeem coupon:", { couponId });
 
   try {
-    const response = await fetch(`${API_URL}/api/redeem-settings`, {
+    const response = await fetchWithAuth(`${API_URL}/api/redeem-settings`, {
       method: "DELETE",
-      headers: getAuthHeaders(true),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         couponId,
       }),
@@ -788,10 +943,10 @@ export async function getProducts(
     queryParams.append("keyword", keyword.trim());
   }
 
-  const response = await fetch(
+  const response = await fetchWithAuth(
     `${API_URL}/api/products?${queryParams.toString()}`,
     {
-      headers: getAuthHeaders(),
+      method: "GET",
     }
   );
 
@@ -871,10 +1026,10 @@ export async function getWidgetCustomization(
 ): Promise<WidgetCustomization | null> {
   console.log("📥 Fetching widget customization:", { storeId, channelId });
 
-  const response = await fetch(
+  const response = await fetchWithAuth(
     `${API_URL}/api/widget-customization?storeId=${storeId}&channelId=${channelId}`,
     {
-      headers: getAuthHeaders(),
+      method: "GET",
     }
   );
 
@@ -909,9 +1064,9 @@ export async function saveWidgetCustomization(
     widgetData,
   });
 
-  const response = await fetch(`${API_URL}/api/widget-customization`, {
+  const response = await fetchWithAuth(`${API_URL}/api/widget-customization`, {
     method: "POST",
-    headers: getAuthHeaders(true),
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       storeId,
       channelId,
@@ -948,9 +1103,9 @@ export async function updateWidgetCustomization(
     widgetData,
   });
 
-  const response = await fetch(`${API_URL}/api/widget-customization`, {
+  const response = await fetchWithAuth(`${API_URL}/api/widget-customization`, {
     method: "PUT",
-    headers: getAuthHeaders(true),
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       storeId,
       channelId,
@@ -980,11 +1135,10 @@ export async function deleteWidgetCustomization(
 ): Promise<{ success: boolean; message: string }> {
   console.log("📤 Deleting widget customization:", { storeId, channelId });
 
-  const response = await fetch(
+  const response = await fetchWithAuth(
     `${API_URL}/api/widget-customization?storeId=${storeId}&channelId=${channelId}`,
     {
       method: "DELETE",
-      headers: getAuthHeaders(),
     }
   );
 
@@ -1004,20 +1158,24 @@ export async function deleteWidgetCustomization(
 }
 
 // Setup Progress Functions
+// Note: setupprogress is now calculated automatically from the 4 completion status fields
+// This function recalculates it based on current completion status
 export async function updateSetupProgress(
   channelId: string,
-  progress: number
+  progress?: number // Optional, kept for backward compatibility but ignored
 ): Promise<{ success: boolean; message: string; data?: any }> {
-  console.log("📤 Updating setup progress:", { channelId, progress });
+  console.log("📤 Updating setup progress (auto-calculated):", { channelId });
 
-  const response = await fetch(`${API_URL}/api/channels/setup-progress`, {
-    method: "PATCH",
-    headers: getAuthHeaders(true),
-    body: JSON.stringify({
-      channelId,
-      progress,
-    }),
-  });
+  const response = await fetchWithAuth(
+    `${API_URL}/api/channels/setup-progress`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        channelId,
+      }),
+    }
+  );
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
@@ -1038,10 +1196,10 @@ export async function getSetupProgress(channelId: string): Promise<{
 }> {
   console.log("📥 Fetching setup progress:", { channelId });
 
-  const response = await fetch(
+  const response = await fetchWithAuth(
     `${API_URL}/api/channels/setup-progress?channelId=${channelId}`,
     {
-      headers: getAuthHeaders(),
+      method: "GET",
     }
   );
 
@@ -1055,5 +1213,49 @@ export async function getSetupProgress(channelId: string): Promise<{
 
   const result = await response.json();
   console.log("✅ Setup progress fetched successfully:", result);
+  return result;
+}
+
+// Update page completion status
+export async function updatePageCompletionStatus(
+  channelId: string,
+  pageType:
+    | "pointsTierSystem"
+    | "waysToEarn"
+    | "waysToRedeem"
+    | "customiseWidget",
+  completed: boolean
+): Promise<{ success: boolean; message: string; data?: any }> {
+  console.log("📤 Updating page completion status:", {
+    channelId,
+    pageType,
+    completed,
+  });
+
+  const response = await fetchWithAuth(
+    `${API_URL}/api/channels/page-completion`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        channelId,
+        pageType,
+        completed: completed ? 1 : 0,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error updating page completion status:", errorBody);
+    throw new Error(
+      errorBody.message ||
+        errorBody.error ||
+        "Failed to update page completion status"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Page completion status updated successfully:", result);
   return result;
 }

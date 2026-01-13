@@ -29,11 +29,29 @@ const loadSelectedChannelFromStorage = (): Channel | null => {
   return null;
 };
 
-// Initialize with persisted channel if available
+// Load channels array from localStorage on initialization
+const loadChannelsFromStorage = (): Channel[] => {
+  if (typeof window === "undefined") return [];
+  const stored = localStorage.getItem("bc_channels");
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+// Initialize with persisted data if available
 const persistedChannel = loadSelectedChannelFromStorage();
+const persistedChannels = loadChannelsFromStorage();
 
 if (persistedChannel) {
   initialState.selectedChannel = persistedChannel;
+}
+if (persistedChannels.length > 0) {
+  initialState.channels = persistedChannels;
 }
 
 // Async thunk to fetch channels from API
@@ -89,6 +107,76 @@ const channelSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    updateChannelCompletionStatus: (
+      state,
+      action: PayloadAction<{
+        channelId: string;
+        pageType:
+          | "pointsTierSystem"
+          | "waysToEarn"
+          | "waysToRedeem"
+          | "customiseWidget";
+        completed: boolean;
+      }>
+    ) => {
+      const { channelId, pageType, completed } = action.payload;
+      const fieldMap = {
+        pointsTierSystem: "pointsTierSystemCompleted",
+        waysToEarn: "waysToEarnCompleted",
+        waysToRedeem: "waysToRedeemCompleted",
+        customiseWidget: "customiseWidgetCompleted",
+      } as const;
+
+      const fieldName = fieldMap[pageType];
+
+      // Helper function to calculate setupprogress from completion fields
+      const calculateSetupProgress = (channel: Channel): number => {
+        const completionFields = [
+          channel.pointsTierSystemCompleted || false,
+          channel.waysToEarnCompleted || false,
+          channel.waysToRedeemCompleted || false,
+          channel.customiseWidgetCompleted || false,
+        ];
+        return completionFields.filter((field) => field === true).length;
+      };
+
+      // Update in channels array
+      const channelIndex = state.channels.findIndex(
+        (ch) => ch.id === channelId
+      );
+      if (channelIndex !== -1) {
+        const updatedChannel = {
+          ...state.channels[channelIndex],
+          [fieldName]: completed,
+        };
+        // Calculate and update setupprogress
+        updatedChannel.setupprogress = calculateSetupProgress(updatedChannel);
+        state.channels[channelIndex] = updatedChannel;
+      }
+
+      // Update selectedChannel if it matches
+      if (state.selectedChannel?.id === channelId) {
+        const updatedSelectedChannel = {
+          ...state.selectedChannel,
+          [fieldName]: completed,
+        };
+        // Calculate and update setupprogress
+        updatedSelectedChannel.setupprogress = calculateSetupProgress(updatedSelectedChannel);
+        state.selectedChannel = updatedSelectedChannel;
+        // Persist updated selectedChannel to localStorage
+        if (typeof window !== "undefined") {
+          localStorage.setItem(
+            "redux_selected_channel",
+            JSON.stringify(state.selectedChannel)
+          );
+        }
+      }
+
+      // Update localStorage channels array
+      if (typeof window !== "undefined") {
+        localStorage.setItem("bc_channels", JSON.stringify(state.channels));
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -123,6 +211,7 @@ export const {
   setLoading,
   setError,
   clearError,
+  updateChannelCompletionStatus,
 } = channelSlice.actions;
 
 export default channelSlice.reducer;

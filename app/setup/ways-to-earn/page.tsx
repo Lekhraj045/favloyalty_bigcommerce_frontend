@@ -2,9 +2,16 @@
 
 import SetupHeader from "@/components/SetupHeader";
 import SetupNavigation from "@/components/SetupNavigation";
-import { saveCollectSettings, updateSetupProgress } from "@/utils/api";
+import { useAppDispatch } from "@/store/hooks";
+import { updateChannelCompletionStatus } from "@/store/slices/channelSlice";
+import {
+  saveCollectSettings,
+  updatePageCompletionStatus,
+  updateSetupProgress,
+} from "@/utils/api";
 import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import LoadingSkeleton from "./components/LoadingSkeleton";
 import PointsOnEventsSection from "./components/PointsOnEventsSection";
@@ -16,7 +23,9 @@ import type { Event } from "./types";
 import { createEventFromForm } from "./utils";
 
 export default function WaysToEarn() {
+  const router = useRouter();
   const settings = useWaysToEarnSettings();
+  const dispatch = useAppDispatch();
   const [savedEvents, setSavedEvents] = useState<Event[]>([]);
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveAndNextLoading, setSaveAndNextLoading] = useState(false);
@@ -175,7 +184,7 @@ export default function WaysToEarn() {
       if (response && response.success) {
         // Update saved events state after successful save
         setSavedEvents(JSON.parse(JSON.stringify(settings.events)));
-        
+
         // Update setup progress to 2 (only increases, never decreases)
         try {
           await updateSetupProgress(settings.channelId, 2);
@@ -183,7 +192,36 @@ export default function WaysToEarn() {
           console.error("Error updating setup progress:", error);
           // Don't fail the save if progress update fails
         }
-        
+
+        // Check if page is completed: at least one of the 6 ways to earn is enabled
+        const isPageCompleted =
+          settings.signUp.enabled ||
+          settings.everyPurchase.enabled ||
+          settings.birthday.enabled ||
+          settings.referEarn.enabled ||
+          settings.profileCompletion.enabled ||
+          settings.newsletter.enabled;
+
+        // Update page completion status
+        try {
+          await updatePageCompletionStatus(
+            settings.channelId,
+            "waysToEarn",
+            isPageCompleted
+          );
+          // Update Redux store to reflect the new completion status
+          dispatch(
+            updateChannelCompletionStatus({
+              channelId: settings.channelId,
+              pageType: "waysToEarn",
+              completed: isPageCompleted,
+            })
+          );
+        } catch (error) {
+          console.error("Error updating page completion status:", error);
+          // Don't fail the save if completion status update fails
+        }
+
         addToast({
           title: "Success",
           description: "Settings saved successfully",
@@ -194,8 +232,8 @@ export default function WaysToEarn() {
       }
 
       if (isNext) {
-        // Navigate to next step: Ways to Redeem
-        window.location.href = '/setup/ways-to-redeem';
+        // Navigate to next step: Ways to Redeem (using router to preserve Redux state)
+        router.push("/setup/ways-to-redeem");
       }
     } catch (error: any) {
       console.error("Error saving settings:", error);

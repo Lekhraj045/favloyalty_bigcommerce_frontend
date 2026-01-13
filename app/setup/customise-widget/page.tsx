@@ -2,11 +2,13 @@
 
 import SetupHeader from "@/components/SetupHeader";
 import SetupNavigation from "@/components/SetupNavigation";
-import { useAppSelector } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { updateChannelCompletionStatus } from "@/store/slices/channelSlice";
 import {
   getStoreId,
   getWidgetCustomization,
   saveWidgetCustomization,
+  updatePageCompletionStatus,
   updateSetupProgress,
 } from "@/utils/api";
 import { Button } from "@heroui/button";
@@ -26,6 +28,7 @@ import {
 
 function CustomiseWidgetContent() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const selectedChannel = useAppSelector(
     (state) => state.channel.selectedChannel
   );
@@ -166,6 +169,38 @@ function CustomiseWidgetContent() {
         } catch (error) {
           console.error("Error updating setup progress:", error);
           // Don't fail the save if progress update fails
+        }
+
+        // Check if page is completed: Brand colors, Background Pattern, and Widget Icon are selected
+        const isPageCompleted: boolean = !!(
+          state.widgetBgColor &&
+          state.widgetBgColor.trim() !== "" &&
+          state.selectedPattern !== null &&
+          state.selectedPattern !== "none" &&
+          state.selectedWidgetIcon &&
+          state.selectedWidgetIcon.trim() !== ""
+        );
+
+        // Update page completion status
+        if (channelId) {
+          try {
+            await updatePageCompletionStatus(
+              channelId,
+              "customiseWidget",
+              isPageCompleted
+            );
+            // Update Redux store to reflect the new completion status
+            dispatch(
+              updateChannelCompletionStatus({
+                channelId: channelId,
+                pageType: "customiseWidget",
+                completed: isPageCompleted,
+              })
+            );
+          } catch (error) {
+            console.error("Error updating page completion status:", error);
+            // Don't fail the save if completion status update fails
+          }
         }
 
         // Reload data from backend to get updated _id fields and ensure sync
