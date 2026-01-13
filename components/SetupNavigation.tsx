@@ -113,7 +113,12 @@ export default function SetupNavigation({ onNavigate }: SetupNavigationProps) {
           })}
         </div>
 
-        <button className="custom-btn">Email</button>
+        <button 
+          onClick={() => handleNavigation("/email")}
+          className="custom-btn cursor-pointer"
+        >
+          Email
+        </button>
       </div>
     </>
   );
