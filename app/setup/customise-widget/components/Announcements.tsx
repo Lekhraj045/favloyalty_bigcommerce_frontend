@@ -1,10 +1,32 @@
 import { Button } from "@heroui/button";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { getStorePlan, StorePlan } from "@/utils/api";
 import AnnouncementsTableArea from "./AnnouncementsTable";
 import AnnouncementsModalArea from "./AnnouncementsModal";
 
 export default function AnnouncementsArea() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
+
+  // Helper function to check if user is on free plan
+  const isFreePlan = () => {
+    return storePlan?.plan === "free";
+  };
+
+  // Load store plan information
+  useEffect(() => {
+    const loadStorePlan = async () => {
+      try {
+        const plan = await getStorePlan();
+        setStorePlan(plan);
+      } catch (error) {
+        console.error("Error loading store plan:", error);
+        // Default to free plan if error
+        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null });
+      }
+    };
+    loadStorePlan();
+  }, []);
 
   return (
     <>
@@ -19,10 +41,14 @@ export default function AnnouncementsArea() {
             <AnnouncementsModalArea
               editingIndex={editingIndex}
               onCloseEdit={() => setEditingIndex(null)}
+              isFreePlan={isFreePlan()}
             />
           </div>
 
-          <AnnouncementsTableArea onEdit={(index) => setEditingIndex(index)} />
+          <AnnouncementsTableArea 
+            onEdit={(index) => setEditingIndex(index)}
+            isFreePlan={isFreePlan()}
+          />
         </div>
       </div>
     </>

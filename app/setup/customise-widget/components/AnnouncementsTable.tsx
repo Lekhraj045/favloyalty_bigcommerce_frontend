@@ -11,15 +11,38 @@ import { Tooltip } from "@heroui/tooltip";
 import { SquareArrowOutUpRight, SquarePen, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
 import { useWidgetCustomization } from "../context/WidgetCustomizationContext";
+import UpgradeModal from "@/components/UpgradeModal";
 
 interface AnnouncementsTableAreaProps {
   onEdit?: (index: number) => void;
+  isFreePlan?: boolean;
 }
 
-export default function AnnouncementsTableArea({ onEdit }: AnnouncementsTableAreaProps) {
+export default function AnnouncementsTableArea({ 
+  onEdit,
+  isFreePlan = false 
+}: AnnouncementsTableAreaProps) {
   const { state, toggleAnnouncement, deleteAnnouncement } = useWidgetCustomization();
   const { announcements } = state;
+  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
+
+  const handleEdit = (index: number) => {
+    // Check if it's a restricted announcement (index > 0) for free users
+    if (isFreePlan && index > 0) {
+      setShowUpgradeModal(true);
+      return;
+    }
+    if (onEdit) {
+      onEdit(index);
+    }
+  };
+
+  const handleDelete = (index: number) => {
+    // Allow deletion of all announcements (including restricted ones)
+    deleteAnnouncement(index);
+  };
 
   if (announcements.length === 0) {
     return (
@@ -53,14 +76,19 @@ export default function AnnouncementsTableArea({ onEdit }: AnnouncementsTableAre
           </TableHeader>
 
           <TableBody>
-            {announcements.map((announcement, index) => (
+            {announcements.map((announcement, index) => {
+              const isPremium = isFreePlan && index > 0; // First announcement (index 0) is free
+              
+              return (
               <TableRow key={announcement._id || index}>
-                <TableCell className="flex items-center gap-2">
-                  {index + 1}
+                <TableCell>
+                  <span className={isPremium ? "opacity-60 blur-[0.5px]" : ""}>{index + 1}</span>
                 </TableCell>
 
                 <TableCell>
-                  <div className="w-16 h-10 rounded-lg bg-gray-100 relative overflow-hidden flex items-center justify-center border border-gray-200">
+                  <div className={`w-16 h-10 rounded-lg bg-gray-100 relative overflow-visible flex items-center justify-center border border-gray-200 ${
+                    isPremium ? "opacity-60 blur-[0.5px]" : ""
+                  }`}>
                     {announcement.image ? (
                       announcement.image.startsWith("data:") || announcement.image.startsWith("http") ? (
                         // Base64 data URL or external URL
@@ -94,6 +122,17 @@ export default function AnnouncementsTableArea({ onEdit }: AnnouncementsTableAre
                         className="rounded-lg object-contain"
                       />
                     )}
+                    {isPremium && (
+                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center z-20 shadow-md border-2 border-white">
+                        <svg
+                          className="w-3.5 h-3.5 text-yellow-800"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      </div>
+                    )}
                   </div>
                 </TableCell>
 
@@ -101,14 +140,16 @@ export default function AnnouncementsTableArea({ onEdit }: AnnouncementsTableAre
                   {announcement.link ? (
                     <div className="flex items-center gap-2">
                       <Link href={announcement.link} target="_blank" rel="noopener noreferrer">
-                        <SquareArrowOutUpRight className="w-3 h-3 text-[#616161] hover:text-black" />
+                        <SquareArrowOutUpRight className={`w-3 h-3 ${isPremium ? "text-gray-400" : "text-[#616161] hover:text-black"}`} />
                       </Link>
-                      <span className="text-xs text-[#616161] whitespace-nowrap overflow-hidden text-ellipsis max-w-[250px]">
+                      <span className={`text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-[250px] ${
+                        isPremium ? "opacity-60 blur-[0.5px] text-gray-400" : "text-[#616161]"
+                      }`}>
                         {announcement.link}
                       </span>
                     </div>
                   ) : (
-                    <span className="text-xs text-[#999999]">No link</span>
+                    <span className={`text-xs ${isPremium ? "opacity-60 blur-[0.5px] text-gray-400" : "text-[#999999]"}`}>No link</span>
                   )}
                 </TableCell>
 
@@ -120,28 +161,44 @@ export default function AnnouncementsTableArea({ onEdit }: AnnouncementsTableAre
                       color="success"
                       isSelected={announcement.enable}
                       onValueChange={() => toggleAnnouncement(index)}
+                      isDisabled={isPremium}
+                      classNames={{
+                        base: isPremium ? "opacity-50 cursor-not-allowed" : "",
+                      }}
                     />
-                    <Tooltip showArrow={true} closeDelay={0} content="Edit">
+                    <Tooltip showArrow={true} closeDelay={0} content={isPremium ? "Upgrade to edit" : "Edit"}>
                       <SquarePen
                         size={14}
-                        className="cursor-pointer hover:text-black"
-                        onClick={() => onEdit && onEdit(index)}
+                        className={`${
+                          isPremium
+                            ? "cursor-not-allowed opacity-50 text-gray-400"
+                            : "cursor-pointer hover:text-black"
+                        }`}
+                        onClick={() => handleEdit(index)}
                       />
                     </Tooltip>
                     <Tooltip showArrow={true} closeDelay={0} content="Delete">
                       <Trash2
                         size={14}
                         className="cursor-pointer hover:text-red-500"
-                        onClick={() => deleteAnnouncement(index)}
+                        onClick={() => handleDelete(index)}
                       />
                     </Tooltip>
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+            );
+            })}
           </TableBody>
         </Table>
       </div>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        featureName="Multiple Announcements"
+      />
     </div>
   );
 }

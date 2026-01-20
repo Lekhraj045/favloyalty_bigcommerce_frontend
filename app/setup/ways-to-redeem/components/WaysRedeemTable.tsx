@@ -316,16 +316,18 @@ export default function WaysRedeemTable({
                 </TableCell>
 
                 <TableCell>
-                  <span className="font-bold">{points} Points</span>
+                  <span className={`font-bold ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}>{points} Points</span>
                 </TableCell>
 
-                <TableCell>{redeemType}</TableCell>
+                <TableCell>
+                  <span className={isPremium ? "opacity-60 blur-[0.5px]" : ""}>{redeemType}</span>
+                </TableCell>
 
                 <TableCell>
                   {expiryDays ? (
-                    <span className="font-bold">{expiryDays}</span>
+                    <span className={`font-bold ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}>{expiryDays}</span>
                   ) : (
-                    <span className="text-gray-400">No expiry</span>
+                    <span className={`text-gray-400 ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}>No expiry</span>
                   )}
                 </TableCell>
 

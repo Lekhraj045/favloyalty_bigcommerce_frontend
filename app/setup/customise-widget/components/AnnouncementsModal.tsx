@@ -1,33 +1,40 @@
+import UpgradeModal from "@/components/UpgradeModal";
 import { Button } from "@heroui/button";
 import {
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  useDisclosure,
+    Modal,
+    ModalBody,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    useDisclosure,
 } from "@heroui/modal";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useWidgetCustomization } from "../context/WidgetCustomizationContext";
 import AnnouncementsUploadArea from "./AnnouncementsUpload";
 
 interface AnnouncementsModalAreaProps {
   editingIndex?: number | null;
   onCloseEdit?: () => void;
+  isFreePlan?: boolean;
 }
 
 export default function AnnouncementsModalArea({
   editingIndex = null,
   onCloseEdit,
+  isFreePlan = false,
 }: AnnouncementsModalAreaProps) {
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const { addAnnouncement, updateAnnouncement, state } = useWidgetCustomization();
   const [link, setLink] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
 
   const isEditing = editingIndex !== null;
   const editingAnnouncement = isEditing ? state.announcements[editingIndex] : null;
+  
+  // Check if user can add more announcements
+  const canAddAnnouncement = !isFreePlan || state.announcements.length === 0 || isEditing;
 
   // Load editing data when editingIndex changes
   useEffect(() => {
@@ -51,9 +58,27 @@ export default function AnnouncementsModalArea({
     setImagePreview(preview);
   };
 
+  const handleOpenModal = () => {
+    // Check if free user is trying to add (not edit) and already has 1 announcement
+    if (isFreePlan && !isEditing && state.announcements.length >= 1) {
+      setShowUpgradeModal(true);
+      return;
+    }
+    onOpen();
+  };
+
+  // Check if button should be visually disabled
+  const isButtonDisabled = isFreePlan && !isEditing && state.announcements.length >= 1;
+
   const handleSaveAnnouncement = async () => {
     if (!link.trim()) {
       alert("Please enter a link for the announcement");
+      return;
+    }
+
+    // Double check: prevent adding if free user already has 1 announcement
+    if (isFreePlan && !isEditing && state.announcements.length >= 1) {
+      setShowUpgradeModal(true);
       return;
     }
 
@@ -112,7 +137,11 @@ export default function AnnouncementsModalArea({
 
   return (
     <>
-      <Button className="custom-btn" onPress={onOpen}>
+      <Button 
+        className="custom-btn"
+        onPress={handleOpenModal}
+        isDisabled={isButtonDisabled}
+      >
         Add Announcements
       </Button>
       <Modal
@@ -178,6 +207,13 @@ export default function AnnouncementsModalArea({
           )}
         </ModalContent>
       </Modal>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        featureName="Multiple Announcements"
+      />
     </>
   );
 }

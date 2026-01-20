@@ -7,15 +7,18 @@ import {
   getStoreId,
   saveCollectSettings,
   updateEmailTemplate,
+  getStorePlan,
   type EmailTemplate,
+  type StorePlan,
 } from "@/utils/api";
 import { Spinner } from "@heroui/spinner";
 import { Switch } from "@heroui/switch";
 import { Pencil, Upload, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import React, { useRef as ReactUseRef, useEffect, useMemo, useState } from "react";
+import React, { useRef as ReactUseRef, useEffect, useMemo, useState, useRef } from "react";
 import "react-quill-new/dist/quill.snow.css";
+import UpgradeModal from "@/components/UpgradeModal";
 
 // Dynamically import ReactQuill to avoid SSR issues
 const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
@@ -504,6 +507,29 @@ const EMAIL_KEY_MAP: Record<string, string> = {
 
 export default function EmailsPage() {
   const { selectedChannel } = useAppSelector((state) => state.channel);
+  const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
+  const [restrictedFeatureName, setRestrictedFeatureName] = useState<string>("");
+  const hasDisabledRestrictedEmailsRef = useRef<boolean>(false);
+
+  // Helper function to check if user is on free plan
+  const isFreePlan = () => {
+    return storePlan?.plan === "free";
+  };
+
+  // Helper function to show upgrade modal for a specific feature
+  const showUpgradeModalForFeature = (featureName: string) => {
+    setRestrictedFeatureName(featureName);
+    setShowUpgradeModal(true);
+  };
+
+  // Helper function to check if an email is restricted for free users
+  // Only "signUp" and "purchase" are accessible for free users
+  const isRestrictedEmail = (emailKey: string) => {
+    if (!isFreePlan()) return false;
+    return emailKey !== "signUp" && emailKey !== "purchase";
+  };
+
   const [emailNotifications, setEmailNotifications] = useState<
     EmailNotification[]
   >([
@@ -601,6 +627,79 @@ export default function EmailsPage() {
   const [originalHeadingText, setOriginalHeadingText] = useState<string>("");
   const [originalDescriptionText, setOriginalDescriptionText] = useState<string>("");
   const [originalButtonText, setOriginalButtonText] = useState<string>("");
+
+  // Load store plan information
+  useEffect(() => {
+    const loadStorePlan = async () => {
+      try {
+        const plan = await getStorePlan();
+        setStorePlan(plan);
+      } catch (error) {
+        console.error("Error loading store plan:", error);
+        // Default to free plan if error
+        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null });
+      }
+    };
+    loadStorePlan();
+  }, []);
+
+  // Auto-disable restricted emails if free user has them enabled
+  useEffect(() => {
+    if (!isFreePlan() || loading || hasDisabledRestrictedEmailsRef.current) {
+      return;
+    }
+
+    // Check if any restricted emails are enabled
+    const hasRestrictedEnabled = emailNotifications.some(
+      (email) => isRestrictedEmail(email.key) && email.enabled
+    );
+
+    if (hasRestrictedEnabled) {
+      // Disable all restricted emails
+      const storeId = getStoreId();
+      const channelId = selectedChannel?.id;
+
+      if (storeId && channelId) {
+        const disableRestrictedEmails = async () => {
+          try {
+            // Fetch current settings
+            const currentSettings = await getCollectSettings(storeId, channelId);
+            
+            // Prepare updated email settings with restricted emails disabled
+            const updatedEmailSetting = { ...(currentSettings?.emailSetting || {}) };
+            
+            emailNotifications.forEach((email) => {
+              if (isRestrictedEmail(email.key)) {
+                const backendKey = EMAIL_KEY_MAP[email.key];
+                updatedEmailSetting[backendKey] = {
+                  enable: false,
+                  id: currentSettings?.emailSetting?.[backendKey]?.id || null,
+                };
+              }
+            });
+
+            // Save to backend
+            await saveCollectSettings(storeId, channelId, {
+              emailSetting: updatedEmailSetting,
+            });
+
+            // Update local state
+            setEmailNotifications((prev) =>
+              prev.map((email) =>
+                isRestrictedEmail(email.key) ? { ...email, enabled: false } : email
+              )
+            );
+
+            hasDisabledRestrictedEmailsRef.current = true;
+          } catch (err) {
+            console.error("Error disabling restricted emails:", err);
+          }
+        };
+
+        disableRestrictedEmails();
+      }
+    }
+  }, [storePlan, loading, emailNotifications, selectedChannel?.id]);
 
   // Fetch email settings from backend on mount
   useEffect(() => {
@@ -704,6 +803,13 @@ export default function EmailsPage() {
   }, [selectedEmail, selectedChannel?.id]);
 
   const handleToggle = async (key: string, enabled: boolean) => {
+    // Check if this is a restricted email and user is trying to enable it
+    if (isFreePlan() && isRestrictedEmail(key) && enabled) {
+      const emailLabel = emailNotifications.find((e) => e.key === key)?.label || "Email";
+      showUpgradeModalForFeature(emailLabel);
+      return;
+    }
+
     const storeId = getStoreId();
     const channelId = selectedChannel?.id;
 
@@ -956,6 +1062,7 @@ export default function EmailsPage() {
                 ) : (
                   emailNotifications.map((email) => {
                     const isActive = selectedEmail === email.key;
+                    const isPremium = isRestrictedEmail(email.key);
                     return (
                       <div
                         key={email.key}
@@ -963,11 +1070,11 @@ export default function EmailsPage() {
                           isActive
                             ? "bg-[#3f3f3f] text-white"
                             : "hover:bg-[#f7f7f7]"
-                        }`}
+                        } ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}
                         onClick={() => setSelectedEmail(email.key)}
                       >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className="flex-shrink-0">
+                        <div className="flex items-center gap-3 flex-1 min-w-0 relative">
+                          <div className="flex-shrink-0 relative">
                             <Image
                               src={email.icon}
                               alt={email.label}
@@ -981,6 +1088,17 @@ export default function EmailsPage() {
                                   : "none",
                               }}
                             />
+                            {isPremium && (
+                              <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center z-10 shadow-md border-2 border-white">
+                                <svg
+                                  className="w-2.5 h-2.5 text-yellow-800"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                </svg>
+                              </div>
+                            )}
                           </div>
                           <span
                             className={`text-sm font-medium ${
@@ -992,7 +1110,12 @@ export default function EmailsPage() {
                         </div>
                         <div
                           className="flex-shrink-0 ml-2 flex items-center justify-center min-w-[40px]"
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isPremium && !email.enabled) {
+                              showUpgradeModalForFeature(email.label);
+                            }
+                          }}
                         >
                           {savingEmailKey === email.key ? (
                             <Spinner
@@ -1005,7 +1128,10 @@ export default function EmailsPage() {
                               size="sm"
                               color="success"
                               isSelected={email.enabled}
-                              isDisabled={savingEmailKey !== null}
+                              isDisabled={savingEmailKey !== null || isPremium}
+                              classNames={{
+                                base: isPremium ? "opacity-50 cursor-not-allowed" : "",
+                              }}
                               onValueChange={(enabled) =>
                                 handleToggle(email.key, enabled)
                               }
@@ -1159,13 +1285,26 @@ export default function EmailsPage() {
                     <h2 className="text-lg font-semibold text-[#303030]">
                       {selectedTemplate?.heading || selectedTemplate?.name || emailNotifications.find((e) => e.key === selectedEmail)?.label || "Email Preview"}
                     </h2>
-                    <button
-                      onClick={handleEditClick}
-                      className="custom-btn flex items-center gap-1 cursor-pointer"
-                    >
-                      <Pencil size={14} />
-                      Edit
-                    </button>
+                    {isFreePlan() && isRestrictedEmail(selectedEmail) ? (
+                      <button
+                        onClick={() => {
+                          const emailLabel = emailNotifications.find((e) => e.key === selectedEmail)?.label || "Email Notification";
+                          showUpgradeModalForFeature(emailLabel);
+                        }}
+                        className="custom-btn flex items-center gap-1 cursor-pointer"
+                      >
+                        <Pencil size={14} />
+                        Upgrade to Edit
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleEditClick}
+                        className="custom-btn flex items-center gap-1 cursor-pointer"
+                      >
+                        <Pencil size={14} />
+                        Edit
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -1267,6 +1406,13 @@ export default function EmailsPage() {
           </div>
         </div>
       </div>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        featureName={restrictedFeatureName || "Email Notification"}
+      />
     </>
   );
 }

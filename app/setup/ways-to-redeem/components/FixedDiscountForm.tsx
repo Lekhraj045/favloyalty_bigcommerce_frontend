@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@heroui/button";
 import { Switch } from "@heroui/switch";
 import { ArrowLeft } from "lucide-react";
 import { useAppSelector } from "@/store/hooks";
-import { getStoreId } from "@/utils/api";
+import { getStoreId, getStorePlan, StorePlan } from "@/utils/api";
 import { createRedeemCoupon, updateRedeemCoupon, type CreateRedeemCouponData, type RedeemCoupon } from "@/utils/api";
 import { addToast } from "@heroui/toast";
+import UpgradeModal from "@/components/UpgradeModal";
 import CustomerTierSelection from "./CustomerTierSelection";
 import { validateTiers } from "../utils/tierValidation";
 
@@ -42,12 +43,55 @@ export default function FixedDiscountForm({
   const [customerRestrictionEnabled, setCustomerRestrictionEnabled] = useState<boolean>(true); // true = disabled (no restriction)
   const [loading, setLoading] = useState(false);
 
+  // Plan and upgrade modal state
+  const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
+  const hasDisabledMaxPointsRef = useRef<boolean>(false);
+
+  // Helper function to check if user is on free plan
+  const isFreePlan = () => {
+    return storePlan?.plan === "free";
+  };
+
+  // Helper function to show upgrade modal
+  const showUpgradeModalForFeature = () => {
+    setShowUpgradeModal(true);
+  };
+
   // Validation errors
   const [errors, setErrors] = useState<{
     points?: string;
     expireCoupon?: string;
     maxPoints?: string;
   }>({});
+
+  // Load store plan information
+  useEffect(() => {
+    const loadStorePlan = async () => {
+      try {
+        const plan = await getStorePlan();
+        setStorePlan(plan);
+      } catch (error) {
+        console.error("Error loading store plan:", error);
+        // Default to free plan if error
+        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null });
+      }
+    };
+    loadStorePlan();
+  }, []);
+
+  // Disable maxPointsEnabled for free users if it's enabled
+  useEffect(() => {
+    if (
+      storePlan &&
+      storePlan.plan === "free" &&
+      maxPointsEnabled &&
+      !hasDisabledMaxPointsRef.current
+    ) {
+      setMaxPointsEnabled(false);
+      hasDisabledMaxPointsRef.current = true;
+    }
+  }, [storePlan, maxPointsEnabled]);
 
   // Load coupon data when editing, or reset form when creating new
   useEffect(() => {
@@ -185,8 +229,8 @@ export default function FixedDiscountForm({
       }
     }
 
-    // Validate maxPoints if enabled
-    if (maxPointsEnabled) {
+    // Validate maxPoints if enabled and not free plan
+    if (maxPointsEnabled && !isFreePlan()) {
       const maxPointsNum = parseInt(maxPoints);
       if (!maxPoints || isNaN(maxPointsNum) || maxPointsNum < 1 || maxPointsNum > 100000) {
         newErrors.maxPoints = "Maximum points must be between 1 and 1,00,000 (whole numbers only)";
@@ -239,8 +283,9 @@ export default function FixedDiscountForm({
         seletedProductDisable: true, // No product restriction for fixed discount
         currentRestrictionType: "product",
         onlineStoreDashBoardDisable: false,
-        redemptionLimitDisable: !maxPointsEnabled, // false = enabled, true = disabled
-        redemptionLimit: maxPointsEnabled ? parseInt(maxPoints) : 0,
+        // For free users, always disable max points redemption
+        redemptionLimitDisable: !maxPointsEnabled || isFreePlan(), // false = enabled, true = disabled
+        redemptionLimit: (maxPointsEnabled && !isFreePlan()) ? parseInt(maxPoints) : 0,
         minimumnPurchaseAmountDisable: true,
       };
 
@@ -440,16 +485,50 @@ export default function FixedDiscountForm({
       {/* Bottom Section: Maximum Points Redeemable */}
       <div className="card !p-0">
         <div className="flex justify-between items-center gap-6 p-4 border-b border-[#DEDEDE]">
-          <span className="text-base font-bold">
-            Maximum Points Redeemable at One Time
-          </span>
-          <Switch
-            aria-label="Maximum Points Redeemable at One Time"
-            size="sm"
-            color="success"
-            isSelected={maxPointsEnabled}
-            onValueChange={setMaxPointsEnabled}
-          />
+          <div className="flex items-center gap-2">
+            <span className="text-base font-bold">
+              Maximum Points Redeemable at One Time
+            </span>
+            {isFreePlan() && (
+              <div className="w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center">
+                <svg
+                  className="w-3 h-3 text-yellow-800"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+              </div>
+            )}
+          </div>
+          <div
+            onClick={(e) => {
+              if (isFreePlan()) {
+                e.preventDefault();
+                e.stopPropagation();
+                showUpgradeModalForFeature();
+              }
+            }}
+            className={isFreePlan() ? "cursor-pointer" : ""}
+          >
+            <Switch
+              aria-label="Maximum Points Redeemable at One Time"
+              size="sm"
+              color="success"
+              isSelected={maxPointsEnabled}
+              onValueChange={(value) => {
+                if (isFreePlan() && value) {
+                  showUpgradeModalForFeature();
+                  return;
+                }
+                setMaxPointsEnabled(value);
+              }}
+              isDisabled={isFreePlan()}
+              classNames={{
+                base: isFreePlan() ? "opacity-50 cursor-not-allowed" : "",
+              }}
+            />
+          </div>
         </div>
 
         {maxPointsEnabled && (
@@ -527,6 +606,13 @@ export default function FixedDiscountForm({
           {isEditMode ? "Update" : "Create"}
         </Button>
       </div>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        featureName="Maximum Points Redeemable at One Time"
+      />
     </div>
   );
 }
