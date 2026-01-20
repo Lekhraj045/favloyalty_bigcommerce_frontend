@@ -1,18 +1,21 @@
 "use client";
 
+import UpgradeModal from "@/components/UpgradeModal";
 import SetupHeader from "@/components/SetupHeader";
 import SetupNavigation from "@/components/SetupNavigation";
 import { useAppDispatch } from "@/store/hooks";
 import { updateChannelCompletionStatus } from "@/store/slices/channelSlice";
 import {
+  getStorePlan,
   saveCollectSettings,
+  StorePlan,
   updatePageCompletionStatus,
   updateSetupProgress,
 } from "@/utils/api";
 import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import LoadingSkeleton from "./components/LoadingSkeleton";
 import PointsOnEventsSection from "./components/PointsOnEventsSection";
 import PointsOnRejoiningSection from "./components/PointsOnRejoiningSection";
@@ -29,6 +32,74 @@ export default function WaysToEarn() {
   const [savedEvents, setSavedEvents] = useState<Event[]>([]);
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveAndNextLoading, setSaveAndNextLoading] = useState(false);
+  
+  // Plan and upgrade modal state
+  const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
+  const [restrictedFeatureName, setRestrictedFeatureName] = useState<string>("");
+  const hasDisabledFeaturesRef = useRef<boolean>(false);
+
+  // Helper function to check if user is on free plan
+  const isFreePlan = () => {
+    return storePlan?.plan === "free";
+  };
+
+  // Helper function to show upgrade modal
+  const showUpgradeModalForFeature = (featureName: string) => {
+    setRestrictedFeatureName(featureName);
+    setShowUpgradeModal(true);
+  };
+
+  // Load store plan information
+  useEffect(() => {
+    const loadStorePlan = async () => {
+      try {
+        const plan = await getStorePlan();
+        setStorePlan(plan);
+      } catch (error) {
+        console.error("Error loading store plan:", error);
+        // Default to free plan if error
+        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null });
+      }
+    };
+    loadStorePlan();
+  }, []);
+
+  // Disable restricted features for free plan users when settings are loaded
+  useEffect(() => {
+    if (
+      storePlan &&
+      storePlan.plan === "free" &&
+      !settings.loading &&
+      !hasDisabledFeaturesRef.current
+    ) {
+      // Disable Birthday if enabled
+      if (settings.birthday.enabled) {
+        settings.setBirthdayEnabled(false);
+      }
+      // Disable Refer & Earn if enabled
+      if (settings.referEarn.enabled) {
+        settings.setReferEarnEnabled(false);
+      }
+      // Disable Profile Completion if enabled
+      if (settings.profileCompletion.enabled) {
+        settings.setProfileCompletionEnabled(false);
+      }
+      // Disable Newsletter if enabled
+      if (settings.newsletter.enabled) {
+        settings.setNewsletterEnabled(false);
+      }
+      // Disable Events if enabled
+      if (settings.eventsEnabled) {
+        settings.setEventsEnabled(false);
+      }
+      // Disable Rejoin if enabled
+      if (settings.rejoin.enabled) {
+        settings.setRejoinEnabled(false);
+      }
+      hasDisabledFeaturesRef.current = true;
+    }
+  }, [storePlan, settings.loading]);
 
   // Update savedEvents when events are loaded
   useEffect(() => {
@@ -356,6 +427,8 @@ export default function WaysToEarn() {
             settings.setNewsletterPoints(points);
             unsavedChanges.setHasUnsavedChanges(true);
           }}
+          isFreePlan={isFreePlan()}
+          onPremiumClick={showUpgradeModalForFeature}
         />
 
         <PointsOnEventsSection
@@ -364,7 +437,10 @@ export default function WaysToEarn() {
           formData={settings.eventFormData}
           searchQuery={settings.eventSearchQuery}
           filteredEvents={filteredEvents}
-          onToggleChange={settings.setEventsEnabled}
+          onToggleChange={(enabled) => {
+            settings.setEventsEnabled(enabled);
+            unsavedChanges.setHasUnsavedChanges(true);
+          }}
           onFormChange={(field, value) => {
             settings.setEventFormData({
               ...settings.eventFormData,
@@ -377,15 +453,22 @@ export default function WaysToEarn() {
           onCancelEvent={handleCancelEvent}
           onDeleteEvent={handleDeleteEvent}
           onSearchChange={settings.setEventSearchQuery}
+          isFreePlan={isFreePlan()}
+          onPremiumClick={showUpgradeModalForFeature}
         />
 
         <PointsOnRejoiningSection
           enabled={settings.rejoin.enabled}
           recallDays={settings.rejoin.recallDays}
           points={settings.rejoin.points}
-          onToggleChange={settings.setRejoinEnabled}
+          onToggleChange={(enabled) => {
+            settings.setRejoinEnabled(enabled);
+            unsavedChanges.setHasUnsavedChanges(true);
+          }}
           onRecallDaysChange={settings.setRecallDays}
           onPointsChange={settings.setRejoinPoints}
+          isFreePlan={isFreePlan()}
+          onPremiumClick={showUpgradeModalForFeature}
         />
 
         {/* Action Buttons */}
@@ -421,6 +504,13 @@ export default function WaysToEarn() {
           unsavedChanges.handleDiscardUnsavedChanges();
         }}
         isLoading={saveLoading}
+      />
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        featureName={restrictedFeatureName}
       />
     </div>
   );

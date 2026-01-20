@@ -1259,3 +1259,154 @@ export async function updatePageCompletionStatus(
   console.log("✅ Page completion status updated successfully:", result);
   return result;
 }
+
+// Email Template Types
+export interface EmailTemplate {
+  _id?: string;
+  channel_id?: string;
+  templateType: string;
+  name: string;
+  heading: string;
+  imageUrl: string;
+  body: string;
+  emailTemplate: string;
+  options?: string[];
+  metaData?: {
+    createdAt?: Date | string;
+    updatedAt?: Date | string;
+  };
+}
+
+// Get email template by type
+export async function getEmailTemplateByType(
+  channelId: string,
+  templateType: string
+): Promise<EmailTemplate | null> {
+  console.log("📥 Fetching email template:", { channelId, templateType });
+
+  const response = await fetchWithAuth(
+    `${API_URL}/api/email-templates/by-type?channelId=${channelId}&templateType=${templateType}`,
+    {
+      method: "GET",
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      console.log("ℹ️ No email template found");
+      return null;
+    }
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error fetching email template:", errorBody);
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to fetch email template"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Email template fetched successfully:", result);
+  return result.data || result;
+}
+
+// Update email template
+export async function updateEmailTemplate(
+  channelId: string,
+  templateType: string,
+  templateData: Partial<EmailTemplate>,
+  bannerImageFile?: File
+): Promise<EmailTemplate> {
+  console.log("📤 Updating email template:", { channelId, templateType, templateData, hasBannerImage: !!bannerImageFile });
+
+  // If there's a banner image file, use FormData
+  if (bannerImageFile) {
+    const formData = new FormData();
+    formData.append("channelId", channelId);
+    formData.append("templateType", templateType);
+    formData.append("bannerImage", bannerImageFile);
+    
+    // Append other template data as JSON string
+    Object.keys(templateData).forEach((key) => {
+      const value = templateData[key as keyof EmailTemplate];
+      if (value !== undefined && value !== null) {
+        if (typeof value === 'object') {
+          formData.append(key, JSON.stringify(value));
+        } else {
+          formData.append(key, String(value));
+        }
+      }
+    });
+
+    const response = await fetchWithAuth(
+      `${API_URL}/api/email-templates`,
+      {
+        method: "PUT",
+        body: formData,
+      }
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      console.error("❌ Error updating email template:", errorBody);
+      throw new Error(
+        errorBody.message || errorBody.error || "Failed to update email template"
+      );
+    }
+
+    const result = await response.json();
+    console.log("✅ Email template updated successfully:", result);
+    return result.data || result;
+  } else {
+    // No file upload, use JSON
+    const response = await fetchWithAuth(
+      `${API_URL}/api/email-templates`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          channelId,
+          templateType,
+          ...templateData,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      console.error("❌ Error updating email template:", errorBody);
+      throw new Error(
+        errorBody.message || errorBody.error || "Failed to update email template"
+      );
+    }
+
+    const result = await response.json();
+    console.log("✅ Email template updated successfully:", result);
+    return result.data || result;
+  }
+}
+
+// Store Plan Types
+export interface StorePlan {
+  plan: "free" | "paid";
+  trialDaysRemaining: number | null;
+  paypalSubscriptionId: string | null;
+}
+
+// Get store plan information
+export async function getStorePlan(): Promise<StorePlan> {
+  console.log("📥 Fetching store plan...");
+
+  const response = await fetchWithAuth(`${API_URL}/api/store/plan`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error fetching store plan:", errorBody);
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to fetch store plan"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Store plan fetched successfully:", result);
+  return result.data || result;
+}

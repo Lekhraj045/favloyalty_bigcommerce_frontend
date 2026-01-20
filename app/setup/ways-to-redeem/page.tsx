@@ -1,15 +1,18 @@
 "use client";
 
+import UpgradeModal from "@/components/UpgradeModal";
 import SetupHeader from "@/components/SetupHeader";
 import SetupNavigation from "@/components/SetupNavigation";
 import { useAppDispatch } from "@/store/hooks";
 import { updateChannelCompletionStatus } from "@/store/slices/channelSlice";
 import {
-  deleteRedeemCoupon,
-  toggleCouponStatus,
-  updatePageCompletionStatus,
-  updateSetupProgress,
-  type RedeemCoupon,
+    deleteRedeemCoupon,
+    getStorePlan,
+    toggleCouponStatus,
+    StorePlan,
+    updatePageCompletionStatus,
+    updateSetupProgress,
+    type RedeemCoupon,
 } from "@/utils/api";
 import { Button } from "@heroui/button";
 import type { Selection } from "@heroui/table";
@@ -17,7 +20,7 @@ import { addToast } from "@heroui/toast";
 import { Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import DeleteBulkCouponsModal from "./components/DeleteBulkCouponsModal";
 import FixedDiscountForm from "./components/FixedDiscountForm";
 import FreeProductForm from "./components/FreeProductForm";
@@ -50,6 +53,64 @@ export default function WaysToRedeem() {
   const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
   const [deletingBulk, setDeletingBulk] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  
+  // Plan and upgrade modal state
+  const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
+  const [restrictedFeatureName, setRestrictedFeatureName] = useState<string>("");
+  const hasDisabledPremiumCouponsRef = useRef<boolean>(false);
+
+  // Helper function to check if user is on free plan
+  const isFreePlan = () => {
+    return storePlan?.plan === "free";
+  };
+
+  // Helper function to show upgrade modal
+  const showUpgradeModalForFeature = (featureName: string) => {
+    setRestrictedFeatureName(featureName);
+    setShowUpgradeModal(true);
+  };
+
+  // Load store plan information
+  useEffect(() => {
+    const loadStorePlan = async () => {
+      try {
+        const plan = await getStorePlan();
+        setStorePlan(plan);
+      } catch (error) {
+        console.error("Error loading store plan:", error);
+        // Default to free plan if error
+        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null });
+      }
+    };
+    loadStorePlan();
+  }, []);
+
+  // Disable premium coupons for free plan users when coupons are loaded
+  useEffect(() => {
+    if (
+      storePlan &&
+      storePlan.plan === "free" &&
+      !loading &&
+      redeemCoupons.length > 0 &&
+      !hasDisabledPremiumCouponsRef.current
+    ) {
+      // Check if any premium coupons are enabled and disable them
+      const premiumCoupons = redeemCoupons.filter(
+        (coupon) => coupon.redeemType !== "storeCredit" && coupon.coupon?.active
+      );
+
+      if (premiumCoupons.length > 0) {
+        // Disable all premium coupons
+        premiumCoupons.forEach((coupon) => {
+          if (coupon._id && updateCouponStatusLocally) {
+            updateCouponStatusLocally(coupon._id, false);
+          }
+        });
+        hasDisabledPremiumCouponsRef.current = true;
+      }
+    }
+  }, [storePlan, loading, redeemCoupons, updateCouponStatusLocally]);
 
   // Filter coupons that have coupon data
   const validCoupons = redeemCoupons.filter((coupon) => coupon.coupon);
@@ -437,7 +498,11 @@ export default function WaysToRedeem() {
                         Delete All
                       </Button>
                     )}
-                    <WaysModal onSelectRedeemType={handleSelectRedeemType} />
+                    <WaysModal 
+                      onSelectRedeemType={handleSelectRedeemType}
+                      isFreePlan={isFreePlan()}
+                      onPremiumClick={showUpgradeModalForFeature}
+                    />
                   </div>
                 </div>
 
@@ -450,6 +515,8 @@ export default function WaysToRedeem() {
                       onEditCoupon={handleEditCoupon}
                       selectedKeys={selectedKeys}
                       onSelectionChange={setSelectedKeys}
+                      isFreePlan={isFreePlan()}
+                      onPremiumClick={showUpgradeModalForFeature}
                     />
                   ) : (
                     <div className="flex flex-col gap-4 justify-center items-center">
@@ -520,6 +587,13 @@ export default function WaysToRedeem() {
         onConfirm={handleDeleteAllConfirm}
         isLoading={deletingAll}
         count={validCoupons.length}
+      />
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        featureName={restrictedFeatureName}
       />
     </div>
   );

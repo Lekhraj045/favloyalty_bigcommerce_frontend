@@ -13,6 +13,8 @@ interface WaysToEarnSectionProps {
   onReferEarnChange: (enabled: boolean, points: string) => void;
   onProfileCompletionChange: (enabled: boolean, points: string) => void;
   onNewsletterChange: (enabled: boolean, points: string) => void;
+  isFreePlan?: boolean;
+  onPremiumClick?: (featureName: string) => void;
 }
 
 export default function WaysToEarnSection({
@@ -28,6 +30,8 @@ export default function WaysToEarnSection({
   onReferEarnChange,
   onProfileCompletionChange,
   onNewsletterChange,
+  isFreePlan = false,
+  onPremiumClick,
 }: WaysToEarnSectionProps) {
   return (
     <div className="card !p-0">
@@ -69,6 +73,8 @@ export default function WaysToEarnSection({
             onBirthdayChange(birthday.enabled, points)
           }
           tooltipContent="Customers receive birthday points upon entering their birthdate via the widget. Once set, the birthdate cannot be modified for a period of 365 days to prevent potential misuse."
+          isPremium={isFreePlan}
+          onPremiumClick={() => onPremiumClick?.("Birthday")}
         />
 
         <ToggleInputField
@@ -82,6 +88,8 @@ export default function WaysToEarnSection({
             onReferEarnChange(referEarn.enabled, points)
           }
           tooltipContent="When a customer refers a friend: The friend gets points upon signing up, and customer will receive points after the friend makes their first purchase upon fullfillment of the order."
+          isPremium={isFreePlan}
+          onPremiumClick={() => onPremiumClick?.("Refer & Earn")}
         />
 
         <ToggleInputField
@@ -94,6 +102,8 @@ export default function WaysToEarnSection({
           onPointsChange={(points) =>
             onProfileCompletionChange(profileCompletion.enabled, points)
           }
+          isPremium={isFreePlan}
+          onPremiumClick={() => onPremiumClick?.("Profile Completion")}
         />
 
         <ToggleInputField
@@ -106,6 +116,8 @@ export default function WaysToEarnSection({
           onPointsChange={(points) =>
             onNewsletterChange(newsletter.enabled, points)
           }
+          isPremium={isFreePlan}
+          onPremiumClick={() => onPremiumClick?.("Subscribing to newsletter")}
         />
       </div>
     </div>

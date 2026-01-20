@@ -2,12 +2,12 @@ import type { RedeemCoupon } from "@/utils/api";
 import type { Selection } from "@heroui/react";
 import { Switch } from "@heroui/switch";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableColumn,
+    TableHeader,
+    TableRow,
 } from "@heroui/table";
 import { Tooltip } from "@heroui/tooltip";
 import { SquarePen, Trash2 } from "lucide-react";
@@ -22,6 +22,8 @@ interface WaysRedeemTableProps {
   onEditCoupon?: (coupon: RedeemCoupon) => void;
   selectedKeys?: Selection;
   onSelectionChange?: (keys: Selection) => void;
+  isFreePlan?: boolean;
+  onPremiumClick?: (featureName: string) => void;
 }
 
 // Helper function to get icon path based on redeem type
@@ -137,6 +139,8 @@ export default function WaysRedeemTable({
   onEditCoupon,
   selectedKeys,
   onSelectionChange,
+  isFreePlan = false,
+  onPremiumClick,
 }: WaysRedeemTableProps) {
   // Filter out coupons that don't have coupon data
   const validCoupons = coupons.filter((coupon) => coupon.coupon);
@@ -147,11 +151,31 @@ export default function WaysRedeemTable({
   } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Helper function to check if coupon is fixed discount
+  const isFixedDiscount = (redeemType: string): boolean => {
+    return redeemType === "storeCredit";
+  };
+
+  // Helper function to check if coupon is premium (not fixed discount)
+  const isPremiumCoupon = (redeemType: string): boolean => {
+    return !isFixedDiscount(redeemType);
+  };
+
   const handleToggleCoupon = (
     couponId: string | undefined,
-    currentStatus: boolean
+    currentStatus: boolean,
+    redeemType: string
   ) => {
     if (!couponId) {
+      return;
+    }
+
+    // Check if it's a premium coupon and user is on free plan
+    if (isFreePlan && isPremiumCoupon(redeemType)) {
+      const featureName = formatRedeemType(redeemType);
+      if (onPremiumClick) {
+        onPremiumClick(featureName);
+      }
       return;
     }
 
@@ -160,6 +184,22 @@ export default function WaysRedeemTable({
     // Update local state immediately
     if (onToggleCoupon) {
       onToggleCoupon(couponId, newStatus);
+    }
+  };
+
+  const handleEditCoupon = (coupon: RedeemCoupon) => {
+    // Check if it's a premium coupon and user is on free plan
+    if (isFreePlan && isPremiumCoupon(coupon.redeemType)) {
+      const featureName = formatRedeemType(coupon.redeemType);
+      if (onPremiumClick) {
+        onPremiumClick(featureName);
+      }
+      return;
+    }
+
+    // Allow editing if it's fixed discount or user is on premium plan
+    if (onEditCoupon) {
+      onEditCoupon(coupon);
     }
   };
 
@@ -242,11 +282,16 @@ export default function WaysRedeemTable({
               coupon.coupon?.price_rule_id ||
               `coupon-${Math.random()}`;
 
+            const isPremium = isFreePlan && isPremiumCoupon(coupon.redeemType);
+            const isFixed = isFixedDiscount(coupon.redeemType);
+
             return (
               <TableRow key={rowKey}>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <div className="border border-[#DEDEDE] rounded-lg p-2 w-10 h-10 max-w-10 max-h-10 flex items-center justify-center">
+                    <div className={`border border-[#DEDEDE] rounded-lg p-2 w-10 h-10 max-w-10 max-h-10 flex items-center justify-center relative ${
+                      isPremium ? "opacity-60 blur-[0.5px]" : ""
+                    }`}>
                       <Image
                         src={iconPath}
                         width={24}
@@ -254,8 +299,19 @@ export default function WaysRedeemTable({
                         alt={redeemType}
                         priority
                       />
+                      {isPremium && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center z-10">
+                          <svg
+                            className="w-3 h-3 text-yellow-800"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        </div>
+                      )}
                     </div>
-                    <span className="font-bold">{couponName}</span>
+                    <span className={`font-bold ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}>{couponName}</span>
                   </div>
                 </TableCell>
 
@@ -275,28 +331,45 @@ export default function WaysRedeemTable({
 
                 <TableCell>
                   <div className="flex justify-end items-center gap-3">
-                    <Switch
-                      isSelected={isActive}
-                      size="sm"
-                      classNames={{
-                        wrapper: "group-data-[selected=true]:bg-green-500",
+                    <div
+                      onClick={(e) => {
+                        if (isPremium) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const featureName = formatRedeemType(coupon.redeemType);
+                          if (onPremiumClick) {
+                            onPremiumClick(featureName);
+                          }
+                        }
                       }}
-                      onValueChange={() => {
-                        handleToggleCoupon(coupon._id, isActive);
-                      }}
-                    />
+                      className={isPremium ? "cursor-pointer" : ""}
+                    >
+                      <Switch
+                        isSelected={isActive}
+                        size="sm"
+                        classNames={{
+                          wrapper: "group-data-[selected=true]:bg-green-500",
+                          base: isPremium ? "opacity-50 cursor-not-allowed" : "",
+                        }}
+                        onValueChange={() => {
+                          handleToggleCoupon(coupon._id, isActive, coupon.redeemType);
+                        }}
+                        isDisabled={isPremium}
+                      />
+                    </div>
                     <Tooltip showArrow={true} closeDelay={0} content="Edit">
                       <button
-                        className="bg-gray-700 rounded-lg p-1.5 hover:bg-gray-800 transition-colors"
-                        onClick={() => {
-                          if (onEditCoupon) {
-                            onEditCoupon(coupon);
-                          }
-                        }}
+                        className={`rounded-lg p-1.5 transition-colors ${
+                          isPremium
+                            ? "bg-gray-300 cursor-not-allowed opacity-50"
+                            : "bg-gray-700 hover:bg-gray-800"
+                        }`}
+                        onClick={() => handleEditCoupon(coupon)}
+                        disabled={isPremium}
                       >
                         <SquarePen
                           size={14}
-                          className="text-white cursor-pointer"
+                          className={`${isPremium ? "text-gray-500" : "text-white cursor-pointer"}`}
                         />
                       </button>
                     </Tooltip>

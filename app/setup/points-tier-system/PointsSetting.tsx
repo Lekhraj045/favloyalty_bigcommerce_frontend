@@ -1,5 +1,6 @@
 "use client";
 
+import UpgradeModal from "@/components/UpgradeModal";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { updateChannelCompletionStatus } from "@/store/slices/channelSlice";
 import { setPointsData } from "@/store/slices/pointsSlice";
@@ -8,9 +9,11 @@ import {
   CustomPointName,
   getPoints,
   getStoreId,
+  getStorePlan,
   Logo,
   PointData,
   savePoints,
+  StorePlan,
   Tier,
   updatePageCompletionStatus,
   updatePoints,
@@ -73,6 +76,11 @@ export default function PointsSetting() {
   const [showCustomNameModal, setShowCustomNameModal] =
     useState<boolean>(false);
   const [resetTierEditing, setResetTierEditing] = useState<boolean>(false);
+  
+  // Plan and upgrade modal state
+  const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
+  const [restrictedFeatureName, setRestrictedFeatureName] = useState<string>("");
 
   // Get selected channel from Redux store
   const selectedChannel = useAppSelector(
@@ -131,6 +139,40 @@ export default function PointsSetting() {
     setValidationErrors({});
   }, []);
 
+  // Load store plan information
+  useEffect(() => {
+    const loadStorePlan = async () => {
+      try {
+        const plan = await getStorePlan();
+        setStorePlan(plan);
+        
+        // If free plan, ensure expiry and tiers are turned off
+        if (plan.plan === "free") {
+          setExpiry(false);
+          setTierStatus(false);
+        }
+      } catch (error) {
+        console.error("Error loading store plan:", error);
+        // Default to free plan if error
+        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null });
+        setExpiry(false);
+        setTierStatus(false);
+      }
+    };
+    loadStorePlan();
+  }, []);
+
+  // Helper function to check if user is on free plan
+  const isFreePlan = () => {
+    return storePlan?.plan === "free";
+  };
+
+  // Helper function to show upgrade modal
+  const showUpgradeModalForFeature = (featureName: string) => {
+    setRestrictedFeatureName(featureName);
+    setShowUpgradeModal(true);
+  };
+
   // Load existing points data
   useEffect(() => {
     const loadPointsData = async () => {
@@ -149,9 +191,11 @@ export default function PointsSetting() {
           setPointId(data._id || data.pointName);
           setPointName(data.pointName);
           setSelectedPointNameOption(data.pointName);
-          setExpiry(data.expiry);
+          // If free plan, ensure expiry and tiers are off regardless of saved data
+          const isFree = storePlan?.plan === "free";
+          setExpiry(isFree ? false : data.expiry);
           setExpiriesInDays(data.expiriesInDays || 1);
-          setTierStatus(data.tierStatus);
+          setTierStatus(isFree ? false : data.tierStatus);
           const tiersToSet = data.tier || [
             { tierName: "Silver", pointRequired: 0, multiplier: 1 },
             { tierName: "Gold", pointRequired: 1000, multiplier: 1.2 },
@@ -232,7 +276,7 @@ export default function PointsSetting() {
     };
 
     loadPointsData();
-  }, [storeId, channelId, selectedChannel?.id, resetFormToDefaults]);
+  }, [storeId, channelId, selectedChannel?.id, resetFormToDefaults, storePlan]);
 
   // Validation functions
   const validateForm = useCallback((): {
@@ -331,6 +375,11 @@ export default function PointsSetting() {
 
   // Handle logo selection
   const handleLogoSelect = (index: number) => {
+    // Restrict logos: only first 3 are accessible for free users
+    if (isFreePlan() && index >= 3) {
+      showUpgradeModalForFeature("Premium Point Icon");
+      return;
+    }
     setSelectedLogo(index);
     setLogoDetails({
       id: index + 1,
@@ -344,6 +393,12 @@ export default function PointsSetting() {
 
   // Handle custom logo upload
   const handleCustomLogoUpload = () => {
+    // Restrict custom logo upload for free users
+    if (isFreePlan()) {
+      showUpgradeModalForFeature("Custom Point Logo");
+      return;
+    }
+    
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/svg+xml";
@@ -369,6 +424,15 @@ export default function PointsSetting() {
 
   // Handle expiry toggle
   const handleExpiryToggle = (checked: boolean) => {
+    // Restrict expiry feature for free users - prevent turning on
+    if (isFreePlan()) {
+      if (checked) {
+        showUpgradeModalForFeature("Set Point Expiry");
+      }
+      // Always keep it false for free users
+      setExpiry(false);
+      return;
+    }
     setExpiry(checked);
     if (!checked) {
       setExpiriesInDays(1);
@@ -388,6 +452,15 @@ export default function PointsSetting() {
 
   // Handle tier toggle
   const handleTierToggle = (checked: boolean) => {
+    // Restrict tiers feature for free users - prevent turning on
+    if (isFreePlan()) {
+      if (checked) {
+        showUpgradeModalForFeature("Do you Want Tiers");
+      }
+      // Always keep it false for free users
+      setTierStatus(false);
+      return;
+    }
     setTierStatus(checked);
     if (!checked) {
       setValidationErrors((prev) => ({
@@ -771,30 +844,52 @@ export default function PointsSetting() {
             <label className="block mb-1 text-[13px]">Point Logo</label>
             <div className="flex gap-4">
               <div className="flex gap-4 items-center">
-                {logos.map((logo, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleLogoSelect(index)}
-                    className={`w-[50px] h-[50px] bg-white rounded-lg flex items-center justify-center cursor-pointer ${
-                      selectedLogo === index && !customLogo
-                        ? "border-solid border-[#007f5f]"
-                        : "border-dashed border-[#abb1ba]"
-                    } border`}
-                    style={{
-                      borderColor:
+                {logos.map((logo, index) => {
+                  const isPremium = index >= 3;
+                  const isRestricted = isFreePlan() && isPremium;
+                  const isLastLogo = index === logos.length - 1;
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => handleLogoSelect(index)}
+                      className={`w-[50px] h-[50px] bg-white rounded-lg flex items-center justify-center relative ${
+                        isRestricted
+                          ? "cursor-pointer opacity-60"
+                          : "cursor-pointer"
+                      } ${
                         selectedLogo === index && !customLogo
-                          ? "#007f5f"
-                          : "#abb1ba",
-                    }}
-                  >
-                    <Image
-                      src={`${process.env.NEXT_PUBLIC_BASE_PATH}/images/${logo}`}
-                      alt="Point Logo"
-                      width={25}
-                      height={25}
-                    />
-                  </button>
-                ))}
+                          ? "border-solid border-[#007f5f]"
+                          : "border-dashed border-[#abb1ba]"
+                      } border`}
+                      style={{
+                        borderColor:
+                          selectedLogo === index && !customLogo
+                            ? "#007f5f"
+                            : "#abb1ba",
+                      }}
+                    >
+                      <Image
+                        src={`${process.env.NEXT_PUBLIC_BASE_PATH}/images/${logo}`}
+                        alt="Point Logo"
+                        width={25}
+                        height={25}
+                        style={isRestricted ? { filter: "grayscale(100%)" } : {}}
+                      />
+                      {/* Show crown icon on premium logos (index >= 3) only for free users */}
+                      {isPremium && isFreePlan() && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center z-10">
+                          <svg
+                            className="w-3 h-3 text-yellow-800"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
                 {/* Custom Logo Display - appears after predefined logos */}
                 {/* Only show if there's a custom logo (either uploaded locally or from database) */}
                 {(() => {
@@ -825,13 +920,30 @@ export default function PointsSetting() {
                 })()}
                 {/* Upload Button - always visible */}
                 <button
-                  className="w-[50px] h-[50px] bg-white border border-dashed border-[#abb1ba] rounded-lg flex items-center justify-center cursor-pointer"
+                  className={`w-[50px] h-[50px] bg-white border border-dashed border-[#abb1ba] rounded-lg flex items-center justify-center relative ${
+                    isFreePlan()
+                      ? "cursor-not-allowed opacity-60"
+                      : "cursor-pointer"
+                  }`}
                   onClick={handleCustomLogoUpload}
+                  disabled={isFreePlan()}
                   title={
                     customLogo ? "Change custom logo" : "Upload custom logo"
                   }
                 >
                   <Upload size={20} color="#616161" />
+                  {/* Show crown icon for free users */}
+                  {isFreePlan() && (
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center z-10">
+                      <svg
+                        className="w-3 h-3 text-yellow-800"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    </div>
+                  )}
                 </button>
               </div>
               <div className="bg-amber-50 rounded-lg py-2 px-4">
@@ -844,7 +956,20 @@ export default function PointsSetting() {
           {/* Point Expiry */}
           <div className="card !bg-[#F8FAFC] flex justify-between gap-2">
             <div className="flex flex-col">
-              <h4 className="text-sm font-bold">Set point expiry</h4>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-bold">Set point expiry</h4>
+                {isFreePlan() && (
+                  <div className="w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center">
+                    <svg
+                      className="w-3 h-3 text-yellow-800"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  </div>
+                )}
+              </div>
               <p>Expire unused points automatically after a certain time.</p>
             </div>
             <div className="flex gap-2 items-center">
@@ -873,13 +998,28 @@ export default function PointsSetting() {
                 />
                 <span className="text-[13px]">days</span>
               </div>
-              <Switch
-                isSelected={expiry}
-                onValueChange={handleExpiryToggle}
-                aria-label="Set point expiry"
-                size="sm"
-                color="success"
-              />
+              <div
+                onClick={(e) => {
+                  if (isFreePlan()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showUpgradeModalForFeature("Set Point Expiry");
+                  }
+                }}
+                className={isFreePlan() ? "cursor-pointer" : ""}
+              >
+                <Switch
+                  isSelected={expiry}
+                  onValueChange={handleExpiryToggle}
+                  aria-label="Set point expiry"
+                  size="sm"
+                  color="success"
+                  isDisabled={isFreePlan()}
+                  classNames={{
+                    base: isFreePlan() ? "opacity-50 cursor-not-allowed" : "",
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -889,16 +1029,44 @@ export default function PointsSetting() {
       <div className="card !p-0">
         <div className="flex justify-between items-center gap-6 p-4">
           <div className="flex flex-col gap-1">
-            <h2 className="text-base font-bold">Do you Want Tiers?</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold">Do you Want Tiers?</h2>
+              {isFreePlan() && (
+                <div className="w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center">
+                  <svg
+                    className="w-3 h-3 text-yellow-800"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                </div>
+              )}
+            </div>
             <p>Reward loyal customers with higher tiers.</p>
           </div>
-          <Switch
-            isSelected={tierStatus}
-            onValueChange={handleTierToggle}
-            aria-label="Do you Want Tiers?"
-            size="sm"
-            color="success"
-          />
+          <div
+            onClick={(e) => {
+              if (isFreePlan()) {
+                e.preventDefault();
+                e.stopPropagation();
+                showUpgradeModalForFeature("Do you Want Tiers");
+              }
+            }}
+            className={isFreePlan() ? "cursor-pointer" : ""}
+          >
+            <Switch
+              isSelected={tierStatus}
+              onValueChange={handleTierToggle}
+              aria-label="Do you Want Tiers?"
+              size="sm"
+              color="success"
+              isDisabled={isFreePlan()}
+              classNames={{
+                base: isFreePlan() ? "opacity-50 cursor-not-allowed" : "",
+              }}
+            />
+          </div>
         </div>
 
         {tierStatus && (
@@ -933,6 +1101,13 @@ export default function PointsSetting() {
           Save & Next
         </Button>
       </div>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        featureName={restrictedFeatureName}
+      />
     </>
   );
 }
