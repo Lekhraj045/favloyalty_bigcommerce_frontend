@@ -1,16 +1,16 @@
 "use client";
 
-import UpgradeModal from "@/components/UpgradeModal";
 import SetupHeader from "@/components/SetupHeader";
 import SetupNavigation from "@/components/SetupNavigation";
+import UpgradeModal from "@/components/UpgradeModal";
 import { useAppDispatch } from "@/store/hooks";
 import { updateChannelCompletionStatus } from "@/store/slices/channelSlice";
 import {
-  getStorePlan,
-  saveCollectSettings,
-  StorePlan,
-  updatePageCompletionStatus,
-  updateSetupProgress,
+    getStorePlan,
+    saveCollectSettings,
+    StorePlan,
+    updatePageCompletionStatus,
+    updateSetupProgress,
 } from "@/utils/api";
 import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
@@ -253,8 +253,42 @@ export default function WaysToEarn() {
       );
 
       if (response && response.success) {
-        // Update saved events state after successful save
-        setSavedEvents(JSON.parse(JSON.stringify(settings.events)));
+        // Check if events were processed for today
+        const eventsWereProcessed = response.eventProcessing && response.eventProcessing.processed;
+        
+        if (eventsWereProcessed) {
+          console.log("✅ Events were processed for today:", response.eventProcessing);
+        }
+        
+        // Always use events from backend response if available (they have latest statuses)
+        // This ensures that if events were processed, their status is updated to "completed"
+        if (response.data && response.data.event && response.data.event.events) {
+          const updatedEvents = response.data.event.events.map((event: any) => ({
+            ...event,
+            status: event.status || "scheduled",
+            isImmediate: event.isImmediate || false,
+            type: event.type || "default",
+            processingInfo: event.processingInfo || {
+              startedAt: null,
+              completedAt: null,
+              jobID: null,
+              processedCount: 0,
+              failedCount: 0,
+              totalCustomers: 0,
+              error: null,
+            },
+          }));
+          
+          // Update events state with backend data (includes updated statuses like "completed")
+          settings.setEvents(updatedEvents);
+          console.log("✅ Updated events with statuses from backend:", updatedEvents);
+          
+          // Update saved events state with the updated events
+          setSavedEvents(JSON.parse(JSON.stringify(updatedEvents)));
+        } else {
+          // If no events in response, use current events
+          setSavedEvents(JSON.parse(JSON.stringify(settings.events)));
+        }
 
         // Update setup progress to 2 (only increases, never decreases)
         try {
@@ -333,6 +367,29 @@ export default function WaysToEarn() {
   const handleAddEvent = () => {
     const newEvent = createEventFromForm(settings.eventFormData);
     if (newEvent) {
+      // Check for duplicate event (same name and date)
+      const eventDate = new Date(newEvent.eventDate);
+      eventDate.setHours(0, 0, 0, 0);
+      
+      const isDuplicate = settings.events.some((existingEvent) => {
+        const existingDate = new Date(existingEvent.eventDate);
+        existingDate.setHours(0, 0, 0, 0);
+        
+        return (
+          existingEvent.name.toLowerCase() === newEvent.name.toLowerCase() &&
+          existingDate.getTime() === eventDate.getTime()
+        );
+      });
+
+      if (isDuplicate) {
+        addToast({
+          title: "Validation Error",
+          description: `An event with the name "${newEvent.name}" already exists for this date. Please choose a different name or date.`,
+          color: "danger",
+        });
+        return;
+      }
+
       settings.setEvents([...settings.events, newEvent]);
       settings.setEventFormData({ name: "", date: null, points: "" });
       addToast({

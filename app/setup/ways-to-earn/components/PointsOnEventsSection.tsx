@@ -146,6 +146,7 @@ export default function PointsOnEventsSection({
               <div className="w-full">
                 <label className="block mb-1 text-[13px]">Date of Event</label>
                 <DatePicker
+                  key={`date-picker-${events.length}-${formData.name || 'empty'}-${formData.points || 'empty'}`}
                   showMonthAndYearPickers
                   size="sm"
                   value={formData.date || undefined}

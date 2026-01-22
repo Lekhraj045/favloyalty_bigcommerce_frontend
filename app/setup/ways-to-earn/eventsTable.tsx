@@ -14,7 +14,7 @@ import { Tooltip } from "@heroui/tooltip";
 import { CalendarDate, today } from "@internationalized/date";
 import { Clock, SquarePen, Trash2 } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Event, EventFormData } from "./types";
 
 interface EventsTableProps {
@@ -36,6 +36,26 @@ export default function EventsTable({
 }: EventsTableProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editFormData, setEditFormData] = useState<EventFormData | null>(null);
+  
+  // Sort events to show "Scheduled" events first
+  const sortedEvents = useMemo(() => {
+    return [...events].sort((a, b) => {
+      const statusA = (a.status || "").toLowerCase();
+      const statusB = (b.status || "").toLowerCase();
+      
+      // If one is "scheduled" and the other is not, scheduled comes first
+      if (statusA === "scheduled" && statusB !== "scheduled") {
+        return -1;
+      }
+      if (statusA !== "scheduled" && statusB === "scheduled") {
+        return 1;
+      }
+      
+      // If both have the same status or neither is scheduled, maintain original order
+      return 0;
+    });
+  }, [events]);
+  
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -98,7 +118,7 @@ export default function EventsTable({
   const handleSaveEdit = (index: number) => {
     if (!editFormData || !onSave) return;
 
-    const event = events[index];
+    const event = sortedEvents[index];
     if (!event) return;
 
     // Find the original index in the full events array
@@ -178,6 +198,53 @@ export default function EventsTable({
     const selectedDate = new Date(eventDateObj);
     selectedDate.setHours(0, 0, 0, 0);
     const isImmediate = selectedDate.getTime() === todayDate.getTime();
+
+    // Check for duplicate event (same name and date, excluding the current event being edited)
+    // eventsArray is already declared above, so we reuse it
+    const eventDate = new Date(eventDateObj);
+    eventDate.setHours(0, 0, 0, 0);
+    
+    const isDuplicate = eventsArray.some((existingEvent, existingIndex) => {
+      // Find the index in the allEvents array if we're using filtered events
+      let actualExistingIndex = existingIndex;
+      if (allEvents && events !== allEvents) {
+        // Find the actual index in allEvents
+        const foundIndex = allEvents.findIndex((e) => {
+          if (existingEvent._id && e._id) {
+            return e._id === existingEvent._id;
+          }
+          return (
+            e === existingEvent ||
+            (e.name === existingEvent.name &&
+              e.eventDate === existingEvent.eventDate &&
+              e.point === existingEvent.point)
+          );
+        });
+        actualExistingIndex = foundIndex !== -1 ? foundIndex : existingIndex;
+      }
+      
+      // Skip the current event being edited
+      if (actualExistingIndex === actualIndex) {
+        return false;
+      }
+      
+      const existingDate = new Date(existingEvent.eventDate);
+      existingDate.setHours(0, 0, 0, 0);
+      
+      return (
+        existingEvent.name.toLowerCase() === trimmedEventName.toLowerCase() &&
+        existingDate.getTime() === eventDate.getTime()
+      );
+    });
+
+    if (isDuplicate) {
+      addToast({
+        title: "Validation Error",
+        description: `An event with the name "${trimmedEventName}" already exists for this date. Please choose a different name or date.`,
+        color: "danger",
+      });
+      return;
+    }
 
     const updatedEvent: Event = {
       ...event,
@@ -264,7 +331,7 @@ export default function EventsTable({
         </TableHeader>
 
         <TableBody>
-          {events.map((event, index) => {
+          {sortedEvents.map((event, index) => {
             const isEditing = editingIndex === index;
             const currentEditData = isEditing ? editFormData : null;
 
@@ -473,9 +540,17 @@ export default function EventsTable({
                             const actualIndex =
                               originalIndex !== -1 ? originalIndex : index;
 
+                            // Check if event is completed - disable delete for completed events
+                            const isCompleted = event.status?.toLowerCase() === "completed";
+                            
                             return (
                               <span
                                 onClick={(e) => {
+                                  if (isCompleted) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    return false;
+                                  }
                                   e.preventDefault();
                                   e.stopPropagation();
                                   onDelete(
@@ -485,20 +560,37 @@ export default function EventsTable({
                                   return false;
                                 }}
                                 onMouseDown={(e) => {
+                                  if (isCompleted) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    return false;
+                                  }
                                   e.preventDefault();
                                   e.stopPropagation();
                                   return false;
                                 }}
-                                className="cursor-pointer hover:opacity-70 inline-flex items-center"
+                                className={
+                                  isCompleted
+                                    ? "cursor-not-allowed opacity-50 inline-flex items-center"
+                                    : "cursor-pointer hover:opacity-70 inline-flex items-center"
+                                }
                               >
                                 <Tooltip
                                   showArrow={true}
                                   closeDelay={0}
-                                  content="Delete"
+                                  content={
+                                    isCompleted
+                                      ? "Cannot delete completed events"
+                                      : "Delete"
+                                  }
                                 >
                                   <Trash2
                                     size={14}
-                                    className="text-gray-500 hover:text-red-500"
+                                    className={
+                                      isCompleted
+                                        ? "text-gray-300"
+                                        : "text-gray-500 hover:text-red-500"
+                                    }
                                   />
                                 </Tooltip>
                               </span>
