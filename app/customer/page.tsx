@@ -1,9 +1,30 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import ChannelSelector from "@/components/ChannelSelector";
 import { Button } from "@heroui/button";
 import { ArrowLeft } from "lucide-react";
 import CustomerTable from "./components/CustomerTable";
+import { getStorePlan, StorePlan } from "@/utils/api";
 
 export default function CustomersPage() {
+  const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
+
+  // Load store plan information
+  useEffect(() => {
+    const loadStorePlan = async () => {
+      try {
+        const plan = await getStorePlan();
+        setStorePlan(plan);
+      } catch (error) {
+        console.error("Error loading store plan:", error);
+        // Default to free plan if error
+        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null });
+      }
+    };
+    loadStorePlan();
+  }, []);
+
   return (
     <>
       <div className="max-w-5xl mx-auto">
@@ -16,7 +37,10 @@ export default function CustomersPage() {
 
             <div className="flex gap-2.5 items-center">
               <ChannelSelector />
-              <Button className="custom-btn">Upgrade</Button>
+              {/* Only show Upgrade button for free plan users */}
+              {storePlan?.plan === "free" && (
+                <Button className="custom-btn">Upgrade</Button>
+              )}
             </div>
           </div>
 

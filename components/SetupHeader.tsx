@@ -5,7 +5,7 @@ import ChannelSelector from "@/components/ChannelSelector";
 import { Button } from "@heroui/button";
 import { Skeleton } from "@heroui/skeleton";
 import { useAppSelector } from "@/store/hooks";
-import { getSetupProgress } from "@/utils/api";
+import { getSetupProgress, getStorePlan, StorePlan } from "@/utils/api";
 
 export default function SetupHeader() {
   const selectedChannel = useAppSelector(
@@ -13,6 +13,22 @@ export default function SetupHeader() {
   );
   const [setupProgress, setSetupProgress] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
+  const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
+
+  // Load store plan information
+  useEffect(() => {
+    const loadStorePlan = async () => {
+      try {
+        const plan = await getStorePlan();
+        setStorePlan(plan);
+      } catch (error) {
+        console.error("Error loading store plan:", error);
+        // Default to free plan if error
+        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null });
+      }
+    };
+    loadStorePlan();
+  }, []);
 
   // Fetch setup progress when channel changes
   useEffect(() => {
@@ -187,7 +203,10 @@ export default function SetupHeader() {
             })()
           )}
         </div>
-        <Button className="custom-btn">Upgrade</Button>
+        {/* Only show Upgrade button for free plan users */}
+        {storePlan?.plan === "free" && (
+          <Button className="custom-btn">Upgrade</Button>
+        )}
       </div>
     </div>
   );

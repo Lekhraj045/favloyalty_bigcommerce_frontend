@@ -11,19 +11,26 @@ import {
 } from "@heroui/modal";
 import { useDropzone, FileRejection } from "react-dropzone";
 import { Info, X } from "lucide-react";
+import { useAppSelector } from "@/store/hooks";
+import { getStoreId, bulkImportPoints } from "@/utils/api";
+import { addToast } from "@heroui/toast";
 
 interface AdjustCustomerPointsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 export default function AdjustCustomerPointsModal({
   isOpen,
   onClose,
+  onSuccess,
 }: AdjustCustomerPointsModalProps) {
+  const selectedChannel = useAppSelector((state) => state.channel.selectedChannel);
   const [importType, setImportType] = useState("reset");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const onDropAccepted = useCallback((acceptedFiles: File[]) => {
     setError(null);
@@ -56,14 +63,125 @@ export default function AdjustCustomerPointsModal({
     onDropRejected,
   });
 
-  const handleSubmit = () => {
-    // TODO: Implement import points functionality
-    console.log("Import points:", { importType, file: selectedFile });
-    onClose();
-    // Reset form
-    setImportType("reset");
-    setSelectedFile(null);
+  // Parse CSV file
+  const parseCSV = async (file: File): Promise<Array<{ email: string; points: number }>> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          const text = e.target?.result as string;
+          const lines = text.split("\n").filter((line) => line.trim() !== "");
+          
+          if (lines.length < 2) {
+            reject(new Error("CSV file must contain at least a header row and one data row"));
+            return;
+          }
+
+          // Check header
+          const header = lines[0].toLowerCase().trim();
+          if (!header.includes("email") || !header.includes("points")) {
+            reject(new Error("CSV file must have 'email' and 'points' columns"));
+            return;
+          }
+
+          // Parse data rows
+          const customers: Array<{ email: string; points: number }> = [];
+          
+          for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            // Handle CSV parsing (simple split by comma, handle quoted values)
+            const values = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
+            
+            if (values.length < 2) {
+              continue; // Skip invalid rows
+            }
+
+            const email = values[0].trim();
+            const points = parseFloat(values[1].trim());
+
+            if (!email || isNaN(points)) {
+              continue; // Skip invalid rows
+            }
+
+            customers.push({ email, points });
+          }
+
+          if (customers.length === 0) {
+            reject(new Error("No valid customer data found in CSV file"));
+            return;
+          }
+
+          resolve(customers);
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error("Failed to parse CSV file"));
+        }
+      };
+
+      reader.onerror = () => {
+        reject(new Error("Failed to read CSV file"));
+      };
+
+      reader.readAsText(file);
+    });
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedFile) {
+      setError("Please select a CSV file");
+      return;
+    }
+
+    const storeId = getStoreId();
+    if (!storeId || !selectedChannel || !selectedChannel.channel_id) {
+      setError("Store ID or Channel not available");
+      return;
+    }
+
+    setLoading(true);
     setError(null);
+
+    try {
+      // Parse CSV file
+      const customers = await parseCSV(selectedFile);
+
+      // Call API to bulk import points
+      const result = await bulkImportPoints({
+        storeId,
+        channelId: selectedChannel.channel_id,
+        importType: importType as "add" | "reset",
+        customers,
+      });
+
+      // Show success message
+      if (result.data.success > 0) {
+        addToast({
+          title: "Import Successful",
+          description: `Successfully updated ${result.data.success} customer(s). ${result.data.failed > 0 ? `${result.data.failed} failed.` : ""} ${result.data.notFound > 0 ? `${result.data.notFound} customer(s) not found.` : ""}`,
+          color: "success",
+        });
+      } else {
+        addToast({
+          title: "Import Failed",
+          description: `No customers were updated. ${result.data.notFound > 0 ? `${result.data.notFound} customer(s) not found.` : ""}`,
+          color: "danger",
+        });
+      }
+
+      // Call onSuccess callback to refresh customer data
+      if (onSuccess) {
+        onSuccess();
+      }
+
+      handleClose();
+    } catch (err) {
+      console.error("Error importing points:", err);
+      setError(err instanceof Error ? err.message : "Failed to import points");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClose = () => {
@@ -75,8 +193,24 @@ export default function AdjustCustomerPointsModal({
   };
 
   const handleDownloadTemplate = () => {
-    // TODO: Implement download CSV template
-    console.log("Download CSV template");
+    // Create CSV content with sample data
+    const csvContent = `email,points
+joe@example.com,100
+laura@example.com,200
+sarah@example.com,450`;
+
+    // Create blob from CSV content
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    // Create download link
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "customer_points_template.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -196,11 +330,20 @@ export default function AdjustCustomerPointsModal({
               </div>
             </ModalBody>
             <ModalFooter>
-              <Button className="custom-btn-default" onPress={onClose}>
+              <Button 
+                className="custom-btn-default" 
+                onPress={onClose}
+                isDisabled={loading}
+              >
                 Cancel
               </Button>
-              <Button className="custom-btn" onPress={handleSubmit} isDisabled={!selectedFile}>
-                Import Points
+              <Button 
+                className="custom-btn" 
+                onPress={handleSubmit} 
+                isDisabled={!selectedFile || loading || !selectedChannel}
+                isLoading={loading}
+              >
+                {loading ? "Importing..." : "Import Points"}
               </Button>
             </ModalFooter>
           </>

@@ -1,4 +1,7 @@
 "use client";
+import { useAppSelector } from "@/store/hooks";
+import { fetchAndStoreCustomers, getCustomers, getStoreId, type Customer } from "@/utils/api";
+import { Button } from "@heroui/button";
 import {
     Table,
     TableBody,
@@ -8,28 +11,338 @@ import {
     TableRow,
 } from "@heroui/table";
 import { Tooltip } from "@heroui/tooltip";
-import { Eye, Plus, SquarePen, Trash2 } from "lucide-react";
-import { useState } from "react";
-import { Search, X } from "lucide-react";
-import { Button } from "@heroui/button";
+import { Eye, Plus, RefreshCw, Search, SquarePen, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import AdjustCustomerPointsModal from "./AdjustCustomerPointsModal";
 
 export default function CustomerTable() {
     const router = useRouter();
+    const { selectedChannel } = useAppSelector((state) => state.channel);
     const [searchKeyword, setSearchKeyword] = useState("");
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [customers, setCustomers] = useState<Customer[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [fetching, setFetching] = useState(false);
+    const [exportingJSON, setExportingJSON] = useState(false);
+    const [exportingCSV, setExportingCSV] = useState(false);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [total, setTotal] = useState(0);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleExportJSON = () => {
-        // TODO: Implement JSON export functionality
-        console.log("Export as JSON");
+    // Fetch all customers for export (without pagination)
+    const fetchAllCustomers = useCallback(async (): Promise<Customer[]> => {
+        const storeId = getStoreId();
+        if (!storeId || !selectedChannel || !selectedChannel.channel_id) {
+            throw new Error("Store ID or Channel not available");
+        }
+
+        const allCustomers: Customer[] = [];
+        let currentPage = 1;
+        let hasMore = true;
+
+        while (hasMore) {
+            try {
+                const response = await getCustomers(
+                    storeId,
+                    selectedChannel.channel_id,
+                    currentPage,
+                    50 // Use same limit as regular fetch
+                );
+
+                allCustomers.push(...response.data);
+
+                if (currentPage >= response.pagination.totalPages) {
+                    hasMore = false;
+                } else {
+                    currentPage++;
+                }
+            } catch (err) {
+                console.error("Error fetching customers for export:", err);
+                throw err;
+            }
+        }
+
+        return allCustomers;
+    }, [selectedChannel]);
+
+    const handleExportJSON = async () => {
+        if (!selectedChannel || !selectedChannel.channel_id) {
+            setError("Please select a channel to export customers");
+            return;
+        }
+
+        try {
+            setExportingJSON(true);
+            setError(null);
+
+            const allCustomers = await fetchAllCustomers();
+
+            // Format customer data for export
+            const exportData = allCustomers.map((customer) => ({
+                customerId: customer.id,
+                email: customer.email,
+                shop: customer.shop || "",
+                firstName: customer.firstName || "",
+                lastName: customer.lastName || "",
+                points: customer.points || 0,
+                pointsEarned: customer.pointsEarned || 0,
+                pointsRedeemed: customer.pointsRedeemed || 0,
+                currentTier: customer.currentTier || null,
+                tierDisplay: customer.tierDisplay || "None",
+                ordersCount: customer.ordersCount || 0,
+                totalSpent: customer.totalSpent || 0,
+                joiningDate: customer.joiningDate,
+                lastVisit: customer.lastVisit || null,
+                referralCount: customer.refferalCount || 0,
+                bcCustomerId: customer.bcCustomerId || null,
+                channelId: customer.channelId,
+                tags: customer.tags || [],
+                createdAt: customer.createdAt,
+                updatedAt: customer.updatedAt,
+            }));
+
+            // Create JSON blob
+            const jsonString = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([jsonString], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+
+            // Create download link
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `customers_${selectedChannel.channel_id}_${new Date().toISOString().split("T")[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("Error exporting JSON:", err);
+            setError(err instanceof Error ? err.message : "Failed to export customers as JSON");
+        } finally {
+            setExportingJSON(false);
+        }
     };
 
-    const handleExportCSV = () => {
-        // TODO: Implement CSV export functionality
-        console.log("Export as CSV");
+    const handleExportCSV = async () => {
+        if (!selectedChannel || !selectedChannel.channel_id) {
+            setError("Please select a channel to export customers");
+            return;
+        }
+
+        try {
+            setExportingCSV(true);
+            setError(null);
+
+            const allCustomers = await fetchAllCustomers();
+
+            // Define CSV headers
+            const headers = [
+                "Customer ID",
+                "Email",
+                "Shop",
+                "First Name",
+                "Last Name",
+                "Points",
+                "Points Earned",
+                "Points Redeemed",
+                "Tier Display",
+                "Tier Index",
+                "Tier Multiplier",
+                "Tier Min Points Required",
+                "Tier Max Points",
+                "Orders Count",
+                "Total Spent",
+                "Joining Date",
+                "Last Visit",
+                "Referral Count",
+                "BC Customer ID",
+                "Channel ID",
+                "Tags",
+                "Created At",
+                "Updated At",
+            ];
+
+            // Convert customers to CSV rows
+            const csvRows = [
+                headers.join(","), // Header row
+                ...allCustomers.map((customer) => {
+                    const tier = customer.currentTier || {};
+                    const tags = (customer.tags || []).join(";"); // Join tags with semicolon
+                    
+                    return [
+                        `"${customer.id}"`,
+                        `"${customer.email || ""}"`,
+                        `"${(customer.shop || "").replace(/"/g, '""')}"`,
+                        `"${(customer.firstName || "").replace(/"/g, '""')}"`,
+                        `"${(customer.lastName || "").replace(/"/g, '""')}"`,
+                        customer.points || 0,
+                        customer.pointsEarned || 0,
+                        customer.pointsRedeemed || 0,
+                        `"${customer.tierDisplay || "None"}"`,
+                        tier.tierIndex ?? "",
+                        tier.multiplier ?? "",
+                        tier.minPointsRequired ?? "",
+                        tier.maxPoints ?? "",
+                        customer.ordersCount || 0,
+                        customer.totalSpent || 0,
+                        `"${customer.joiningDate ? new Date(customer.joiningDate).toISOString() : ""}"`,
+                        `"${customer.lastVisit ? new Date(customer.lastVisit).toISOString() : ""}"`,
+                        customer.refferalCount || 0,
+                        customer.bcCustomerId || "",
+                        customer.channelId,
+                        `"${tags}"`,
+                        `"${customer.createdAt ? new Date(customer.createdAt).toISOString() : ""}"`,
+                        `"${customer.updatedAt ? new Date(customer.updatedAt).toISOString() : ""}"`,
+                    ].join(",");
+                }),
+            ];
+
+            // Create CSV blob
+            const csvString = csvRows.join("\n");
+            const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+
+            // Create download link
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `customers_${selectedChannel.channel_id}_${new Date().toISOString().split("T")[0]}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("Error exporting CSV:", err);
+            setError(err instanceof Error ? err.message : "Failed to export customers as CSV");
+        } finally {
+            setExportingCSV(false);
+        }
     };
 
+    // Fetch customers from database
+    const loadCustomers = useCallback(async (pageNum: number = 1) => {
+        const storeId = getStoreId();
+        if (!storeId || !selectedChannel) {
+            setError("Store ID or Channel not available");
+            return;
+        }
+
+        // Ensure channel_id is available
+        if (!selectedChannel.channel_id) {
+            setError("Channel ID not available");
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
+        try {
+            console.log("Loading customers for:", {
+                storeId,
+                channelId: selectedChannel.channel_id,
+                page: pageNum,
+            });
+            
+            const response = await getCustomers(
+                storeId,
+                selectedChannel.channel_id,
+                pageNum,
+                50
+            );
+            
+            console.log("Customers loaded:", {
+                count: response.data.length,
+                total: response.pagination.total,
+            });
+            
+            setCustomers(response.data);
+            setPage(response.pagination.page);
+            setTotalPages(response.pagination.totalPages);
+            setTotal(response.pagination.total);
+        } catch (err) {
+            console.error("Error loading customers:", err);
+            setError(err instanceof Error ? err.message : "Failed to load customers");
+        } finally {
+            setLoading(false);
+        }
+    }, [selectedChannel]);
+
+    // Fetch customers from BigCommerce and store in database
+    const handleFetchFromBigCommerce = useCallback(async () => {
+        const storeId = getStoreId();
+        if (!storeId || !selectedChannel) {
+            setError("Store ID or Channel not available");
+            return;
+        }
+
+        setFetching(true);
+        setError(null);
+        try {
+            await fetchAndStoreCustomers(storeId, selectedChannel.channel_id);
+            // Reload customers after fetching
+            await loadCustomers(1);
+        } catch (err) {
+            console.error("Error fetching customers:", err);
+            setError(err instanceof Error ? err.message : "Failed to fetch customers");
+        } finally {
+            setFetching(false);
+        }
+    }, [selectedChannel, loadCustomers]);
+
+    // Load customers when component mounts or channel changes
+    useEffect(() => {
+        if (selectedChannel && selectedChannel.channel_id) {
+            // Clear existing customers when channel changes
+            setCustomers([]);
+            setPage(1);
+            setTotalPages(1);
+            setTotal(0);
+            // Load customers for the new channel
+            loadCustomers(1);
+        } else {
+            // Clear customers if no channel is selected
+            setCustomers([]);
+            setPage(1);
+            setTotalPages(1);
+            setTotal(0);
+        }
+    }, [selectedChannel?.channel_id, loadCustomers]);
+
+    // Filter customers based on search keyword
+    const filteredCustomers = customers.filter((customer) => {
+        if (!searchKeyword) return true;
+        const keyword = searchKeyword.toLowerCase();
+        const fullName = `${customer.firstName || ""} ${customer.lastName || ""}`.toLowerCase();
+        const email = customer.email.toLowerCase();
+        return fullName.includes(keyword) || email.includes(keyword);
+    });
+
+    // Get tier name from customer data (uses tierDisplay from API if available)
+    const getTierName = (customer: Customer) => {
+        // Use tierDisplay from API if available (handles "None" case)
+        if (customer.tierDisplay !== undefined) {
+            return customer.tierDisplay;
+        }
+        // Fallback to calculating from tierIndex
+        const tierIndex = customer.currentTier?.tierIndex || 0;
+        const tiers = ["Silver", "Gold", "Platinum", "Diamond"];
+        return tiers[tierIndex] || "Bronze";
+    };
+
+    // Get tier badge color
+    const getTierBadgeColor = (customer: Customer) => {
+        // If tierDisplay is "None", use a neutral color
+        if (customer.tierDisplay === "None" || !customer.tierStatus) {
+            return "bg-[#E5E5E5] text-[#666666]";
+        }
+        const tierIndex = customer.currentTier?.tierIndex || 0;
+        const colors = [
+            "bg-[#F0F0F0] text-[#303030]",
+            "bg-[#FFEB78] text-[#4f4700]",
+            "bg-[#d5ebff] text-[#003a5a]",
+            "bg-[#e8d5ff] text-[#4a1a6b]",
+        ];
+        return colors[tierIndex] || colors[0];
+    };
 
     return (
         <>
@@ -63,6 +376,8 @@ export default function CustomerTable() {
                             variant="flat"
                             onPress={handleExportJSON}
                             className="custom-btn-default"
+                            isDisabled={!selectedChannel || exportingJSON}
+                            isLoading={exportingJSON}
                         >
                             Export All Customers as JSON
                         </Button>
@@ -70,8 +385,20 @@ export default function CustomerTable() {
                             variant="flat"
                             onPress={handleExportCSV}
                             className="custom-btn-default"
+                            isDisabled={!selectedChannel || exportingCSV}
+                            isLoading={exportingCSV}
                         >
                             Export All Customers as CSV
+                        </Button>
+                        <Button
+                            variant="flat"
+                            onPress={handleFetchFromBigCommerce}
+                            className="custom-btn-default"
+                            isLoading={fetching}
+                            isDisabled={!selectedChannel || fetching}
+                        >
+                            <RefreshCw size={16} className={fetching ? "animate-spin" : ""} />
+                            {fetching ? "Syncing..." : "Sync from BigCommerce"}
                         </Button>
                         <Button
                             onPress={() => setIsModalOpen(true)}
@@ -84,11 +411,22 @@ export default function CustomerTable() {
                 </div>
 
                 <div className="p-4">
+                    {error && (
+                        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                            {error}
+                        </div>
+                    )}
+                    {!selectedChannel && (
+                        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 text-sm">
+                            Please select a channel to view customers.
+                        </div>
+                    )}
                     <div className="tierTable border border-[#DEDEDE] rounded-lg overflow-hidden">
                         <Table
-                            aria-label="Events points table"
+                            aria-label="Customers table"
                             shadow="none"
                             removeWrapper
+                            isLoading={loading}
                             classNames={{
                                 th: "bg-[#F7F7F7] text-xs font-normal text-[#616161] px-3 py-2",
                                 td: "text-xs text-[#2E2E2E] px-3 py-2 border-t border-[#E3E3E3]",
@@ -100,6 +438,7 @@ export default function CustomerTable() {
                                     Name
                                 </TableColumn>
                                 <TableColumn>Email</TableColumn>
+                                <TableColumn>BC Customer ID</TableColumn>
                                 <TableColumn>Total Points</TableColumn>
                                 <TableColumn>Referrals</TableColumn>
                                 <TableColumn>Tier</TableColumn>
@@ -108,117 +447,91 @@ export default function CustomerTable() {
                                 </TableColumn>
                             </TableHeader>
 
-                            <TableBody>
-                                <TableRow key="1">
-                                    <TableCell>Ayumu Hirano</TableCell>
-
-                                    <TableCell>ayumu.hirano@example.com</TableCell>
-
-                                    <TableCell>50</TableCell>
-
-                                    <TableCell>1</TableCell>
-
-                                    <TableCell>
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#F0F0F0] text-[#303030]">
-                                            Silver
-                                        </span>
-                                    </TableCell>
-
-                                    <TableCell>
-                                        <div className="flex justify-end gap-4 text-gray-500">
-                                            <Tooltip showArrow={true} closeDelay={0} content="Edit">
-                                                <SquarePen
-                                                    size={14}
-                                                    className="cursor-pointer hover:text-black"
-                                                    onClick={() => router.push("/customer/customer-details")}
-                                                />
-                                            </Tooltip>
-                                            <Tooltip showArrow={true} closeDelay={0} content="View in Bigcommerce">
-                                                <Eye
-                                                    size={14}
-                                                    className="cursor-pointer hover:text-black"
-                                                />
-                                            </Tooltip>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-
-                                <TableRow key="2">
-                                    <TableCell>John Doe</TableCell>
-
-                                    <TableCell>john.doe@example.com</TableCell>
-
-                                    <TableCell>50</TableCell>
-
-                                    <TableCell>1</TableCell>
-
-                                    <TableCell>
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#FFEB78] text-[#4f4700]">
-                                            Gold
-                                        </span>
-                                    </TableCell>
-
-                                    <TableCell>
-                                        <div className="flex justify-end gap-4 text-gray-500">
-                                            <Tooltip showArrow={true} closeDelay={0} content="Edit">
-                                                <SquarePen
-                                                    size={14}
-                                                    className="cursor-pointer hover:text-black"
-                                                    onClick={() => router.push("/customer/customer-details")}
-                                                />
-                                            </Tooltip>
-                                            <Tooltip showArrow={true} closeDelay={0} content="View in Bigcommerce">
-                                                <Eye
-                                                    size={14}
-                                                    className="cursor-pointer hover:text-black"
-                                                />
-                                            </Tooltip>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-
-                                <TableRow key="3">
-                                    <TableCell>Jane Doe</TableCell>
-
-                                    <TableCell>jane.doe@example.com</TableCell>
-
-                                    <TableCell>50</TableCell>
-
-                                    <TableCell>1</TableCell>
-
-                                    <TableCell>
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#d5ebff] text-[#003a5a]">
-                                            Platinum
-                                        </span>
-                                    </TableCell>
-
-                                    <TableCell>
-                                        <div className="flex justify-end gap-4 text-gray-500">
-                                            <Tooltip showArrow={true} closeDelay={0} content="Edit">
-                                                <SquarePen
-                                                    size={14}
-                                                    className="cursor-pointer hover:text-black"
-                                                    onClick={() => router.push("/customer/customer-details")}
-                                                />
-                                            </Tooltip>
-                                            <Tooltip showArrow={true} closeDelay={0} content="View in Bigcommerce">
-                                                <Eye
-                                                    size={14}
-                                                    className="cursor-pointer hover:text-black"
-                                                />
-                                            </Tooltip>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
+                            <TableBody
+                                emptyContent={
+                                    loading
+                                        ? "Loading customers..."
+                                        : !selectedChannel
+                                        ? "Please select a channel"
+                                        : filteredCustomers.length === 0 && customers.length === 0
+                                        ? "No customers found. Click 'Sync from BigCommerce' to fetch customers."
+                                        : "No customers match your search"
+                                }
+                            >
+                                {filteredCustomers.map((customer) => {
+                                    const fullName = `${customer.firstName || ""} ${customer.lastName || ""}`.trim() || customer.email;
+                                    return (
+                                        <TableRow key={customer.id}>
+                                            <TableCell>{fullName}</TableCell>
+                                            <TableCell>{customer.email}</TableCell>
+                                            <TableCell>{customer.bcCustomerId || "N/A"}</TableCell>
+                                            <TableCell>{customer.points || 0}</TableCell>
+                                            <TableCell>{customer.refferalCount || 0}</TableCell>
+                                            <TableCell>
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${getTierBadgeColor(customer)}`}>
+                                                    {getTierName(customer)}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex justify-end gap-4 text-gray-500">
+                                                    <Tooltip showArrow={true} closeDelay={0} content="Edit">
+                                                        <SquarePen
+                                                            size={14}
+                                                            className="cursor-pointer hover:text-black"
+                                                            onClick={() => router.push(`/customer/customer-details?id=${customer.id}`)}
+                                                        />
+                                                    </Tooltip>
+                                                    <Tooltip showArrow={true} closeDelay={0} content="View in Bigcommerce">
+                                                        <Eye
+                                                            size={14}
+                                                            className="cursor-pointer hover:text-black"
+                                                        />
+                                                    </Tooltip>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
                             </TableBody>
                         </Table>
                     </div>
+                    {totalPages > 1 && (
+                        <div className="flex justify-between items-center mt-4">
+                            <div className="text-sm text-gray-600">
+                                Showing {((page - 1) * 50) + 1} to {Math.min(page * 50, total)} of {total} customers
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="flat"
+                                    size="sm"
+                                    onPress={() => loadCustomers(page - 1)}
+                                    isDisabled={page === 1 || loading}
+                                    className="custom-btn-default"
+                                >
+                                    Previous
+                                </Button>
+                                <Button
+                                    variant="flat"
+                                    size="sm"
+                                    onPress={() => loadCustomers(page + 1)}
+                                    isDisabled={page === totalPages || loading}
+                                    className="custom-btn-default"
+                                >
+                                    Next
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
             <AdjustCustomerPointsModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
+                onSuccess={() => {
+                    // Reload customers after successful import
+                    loadCustomers(page);
+                }}
             />
         </>
     );

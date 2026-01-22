@@ -67,7 +67,7 @@ export default function PointsSetting() {
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
 
   // UI state
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [saveLoading, setSaveLoading] = useState<boolean>(false);
   const [saveAndNextLoading, setSaveAndNextLoading] = useState<boolean>(false);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
@@ -139,29 +139,6 @@ export default function PointsSetting() {
     setValidationErrors({});
   }, []);
 
-  // Load store plan information
-  useEffect(() => {
-    const loadStorePlan = async () => {
-      try {
-        const plan = await getStorePlan();
-        setStorePlan(plan);
-        
-        // If free plan, ensure expiry and tiers are turned off
-        if (plan.plan === "free") {
-          setExpiry(false);
-          setTierStatus(false);
-        }
-      } catch (error) {
-        console.error("Error loading store plan:", error);
-        // Default to free plan if error
-        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null });
-        setExpiry(false);
-        setTierStatus(false);
-      }
-    };
-    loadStorePlan();
-  }, []);
-
   // Helper function to check if user is on free plan
   const isFreePlan = () => {
     return storePlan?.plan === "free";
@@ -173,18 +150,44 @@ export default function PointsSetting() {
     setShowUpgradeModal(true);
   };
 
-  // Load existing points data
+  // Load store plan and points data together to prevent flickering
   useEffect(() => {
-    const loadPointsData = async () => {
+    let isMounted = true;
+
+    const loadAllData = async () => {
       if (!storeId || !channelId) {
         // Reset form if no channel selected
         resetFormToDefaults();
+        setLoading(false);
         return;
       }
 
       try {
-        setLoading(true);
+        // Load store plan first
+        let plan: StorePlan;
+        try {
+          plan = await getStorePlan();
+        } catch (error) {
+          console.error("Error loading store plan:", error);
+          // Default to free plan if error
+          plan = { plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null };
+        }
+
+        if (!isMounted) return;
+
+        setStorePlan(plan);
+        
+        // If free plan, ensure expiry and tiers are turned off
+        if (plan.plan === "free") {
+          setExpiry(false);
+          setTierStatus(false);
+        }
+
+        // Now load points data
         const data = await getPoints(storeId, channelId);
+        
+        if (!isMounted) return;
+
         if (data) {
           // Use _id if available, otherwise fallback to pointName (for backward compatibility)
           console.log("✅ Loaded points data for channel:", data);
@@ -192,7 +195,7 @@ export default function PointsSetting() {
           setPointName(data.pointName);
           setSelectedPointNameOption(data.pointName);
           // If free plan, ensure expiry and tiers are off regardless of saved data
-          const isFree = storePlan?.plan === "free";
+          const isFree = plan.plan === "free";
           setExpiry(isFree ? false : data.expiry);
           setExpiriesInDays(data.expiriesInDays || 1);
           setTierStatus(isFree ? false : data.tierStatus);
@@ -258,6 +261,8 @@ export default function PointsSetting() {
           );
         }
       } catch (error: any) {
+        if (!isMounted) return;
+        
         // If 404 or not found, reset to defaults
         if (
           error?.message?.includes("404") ||
@@ -271,12 +276,18 @@ export default function PointsSetting() {
           console.error("Error loading points:", error);
         }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    loadPointsData();
-  }, [storeId, channelId, selectedChannel?.id, resetFormToDefaults, storePlan]);
+    loadAllData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [storeId, channelId, selectedChannel?.id, resetFormToDefaults]);
 
   // Validation functions
   const validateForm = useCallback((): {
@@ -611,13 +622,6 @@ export default function PointsSetting() {
           }
         }
 
-        addToast({
-          title: "Saved Successfully",
-          description: "Points settings have been saved successfully!",
-          color: "success",
-          promise: new Promise((resolve) => setTimeout(resolve, 1000)),
-        });
-
         // Update setup progress to 1 (only increases, never decreases)
         try {
           await updateSetupProgress(currentChannelId, 1);
@@ -667,11 +671,20 @@ export default function PointsSetting() {
         // Reset tier editing state after successful save
         setResetTierEditing(true);
         setTimeout(() => setResetTierEditing(false), 100);
+
+        // Stop loading first, then show success toast
+        setLoadingState(false);
+        
+        // Show success toast after loading state is cleared
+        addToast({
+          title: "Saved Successfully",
+          description: "Points settings have been saved successfully!",
+          color: "success",
+        });
       } catch (error: any) {
+        setLoadingState(false);
         alert(error.message || "Failed to save points");
         console.error("Error saving points:", error);
-      } finally {
-        setLoadingState(false);
       }
     },
     [

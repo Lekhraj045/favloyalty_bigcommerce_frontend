@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@heroui/button";
 import {
   Modal,
@@ -9,20 +9,37 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@heroui/modal";
+import { createTransaction, getStoreId, type CreateTransactionRequest } from "@/utils/api";
 
 interface AdjustBalanceModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentBalance?: number;
+  customerId?: string;
+  channelId?: number;
+  onSuccess?: () => void;
 }
 
 export default function AdjustBalanceModal({
   isOpen,
   onClose,
-  currentBalance = 300,
+  currentBalance = 0,
+  customerId,
+  channelId,
+  onSuccess,
 }: AdjustBalanceModalProps) {
   const [pointBalance, setPointBalance] = useState<string>(currentBalance.toString());
   const [selectedReason, setSelectedReason] = useState<string>("adjustment-customer-service");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Update pointBalance when currentBalance changes
+  useEffect(() => {
+    if (isOpen) {
+      setPointBalance(currentBalance.toString());
+      setError(null);
+    }
+  }, [currentBalance, isOpen]);
 
   const reasons = [
     { value: "adjustment-customer-service", label: "Adjustment for customer service purposes" },
@@ -32,10 +49,84 @@ export default function AdjustBalanceModal({
     { value: "other", label: "Other" },
   ];
 
-  const handleSubmit = () => {
-    // TODO: Implement adjust balance functionality
-    console.log("Adjust balance:", { pointBalance, reason: selectedReason });
-    handleClose();
+  const getReasonLabel = (value: string): string => {
+    const reason = reasons.find((r) => r.value === value);
+    return reason ? reason.label : value;
+  };
+
+  const handleSubmit = async () => {
+    if (!customerId || !channelId) {
+      setError("Customer ID or Channel ID is missing");
+      return;
+    }
+
+    const storeId = getStoreId();
+    if (!storeId) {
+      setError("Store ID is missing");
+      return;
+    }
+
+    // Validate input
+    const newBalance = parseFloat(pointBalance);
+    if (isNaN(newBalance)) {
+      setError("Please enter a valid number");
+      return;
+    }
+
+    if (newBalance < 0 || newBalance > 1000000) {
+      setError("Point balance must be between 0 and 1,000,000");
+      return;
+    }
+
+    // Calculate point difference
+    const pointDifference = newBalance - currentBalance;
+
+    // If no change, just close
+    if (pointDifference === 0) {
+      handleClose();
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Determine transaction type based on point difference
+      const transactionType: "adjustment" = "adjustment";
+      
+      // Create transaction request
+      const transactionData: CreateTransactionRequest = {
+        customerId,
+        storeId,
+        channelId,
+        type: transactionType,
+        transactionCategory: "manual",
+        points: pointDifference, // Positive for increase, negative for decrease
+        description: pointDifference > 0 
+          ? `Points increased by ${pointDifference}` 
+          : `Points decreased by ${Math.abs(pointDifference)}`,
+        reason: getReasonLabel(selectedReason),
+        status: "completed",
+        source: "admin_panel",
+      };
+
+      await createTransaction(transactionData);
+
+      // Call onSuccess callback to refresh customer data
+      if (onSuccess) {
+        // Small delay to ensure backend has processed the transaction
+        setTimeout(() => {
+          onSuccess();
+        }, 500);
+      }
+
+      handleClose();
+    } catch (err) {
+      console.error("Error adjusting balance:", err);
+      setError(err instanceof Error ? err.message : "Failed to adjust balance");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClose = () => {
@@ -43,6 +134,7 @@ export default function AdjustBalanceModal({
     // Reset form
     setPointBalance(currentBalance.toString());
     setSelectedReason("adjustment-customer-service");
+    setError(null);
   };
 
   return (
@@ -103,14 +195,20 @@ export default function AdjustBalanceModal({
               </div>
             </ModalBody>
             <ModalFooter>
-              <Button className="custom-btn-default" onPress={handleClose}>
+              <Button 
+                className="custom-btn-default" 
+                onPress={handleClose}
+                isDisabled={loading}
+              >
                 Cancel
               </Button>
               <Button
                 className="custom-btn"
                 onPress={handleSubmit}
+                isLoading={loading}
+                isDisabled={loading || !pointBalance || pointBalance === currentBalance.toString()}
               >
-                Adjust balance
+                {loading ? "Adjusting..." : "Adjust balance"}
               </Button>
             </ModalFooter>
           </>

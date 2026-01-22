@@ -145,10 +145,24 @@ const fetchWithAuth = async (
   });
 
   // Make the request with current token
-  let response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (error: any) {
+    // Handle network errors (CORS, server down, etc.)
+    if (error.name === "TypeError" && error.message === "Failed to fetch") {
+      console.error("❌ Network error:", {
+        url,
+        error: error.message,
+        message: "Backend server may not be running or there's a CORS issue",
+      });
+      throw error;
+    }
+    throw error;
+  }
 
   // If we get a 401, try refreshing the token and retry once
   if (response.status === 401 && retryCount < maxRetries) {
@@ -1409,4 +1423,494 @@ export async function getStorePlan(): Promise<StorePlan> {
   const result = await response.json();
   console.log("✅ Store plan fetched successfully:", result);
   return result.data || result;
+}
+
+// Customer Types
+export interface CustomerProfile {
+  name?: string | null;
+  contactNo?: string | null;
+  ageGroup?: string | null;
+  weddingAnniversary?: Date | string | null;
+  dateOfBirth?: Date | string | null;
+}
+
+export interface CustomerAddress {
+  address1?: string | null;
+  address2?: string | null;
+  city?: string | null;
+  company?: string | null;
+  country?: string | null;
+  zip?: string | null;
+  province?: string | null;
+  default?: boolean;
+}
+
+export interface Customer {
+  id: string;
+  email: string;
+  shop: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  points: number;
+  pointsEarned: number;
+  pointsRedeemed: number;
+  ordersCount: number;
+  totalSpent: number;
+  joiningDate: Date | string;
+  lastVisit: Date | string | null;
+  currentTier: {
+    tierIndex: number;
+    multiplier: number;
+    minPointsRequired: number;
+    maxPoints: number | null;
+  };
+  tierDisplay?: string; // "None" if tier system is off, otherwise tier name
+  tierStatus?: boolean; // Whether tier system is enabled for this channel
+  profile?: CustomerProfile;
+  default_address?: CustomerAddress;
+  tags: string[];
+  storeId: string;
+  channelId: number;
+  refferalCount?: number; // Note: typo in backend model (refferalCount)
+  bcCustomerId?: number | null; // BigCommerce customer ID
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+// Transaction Types
+export type TransactionType = "earn" | "redeem" | "adjustment" | "referral" | "signup" | "expiration" | "refund";
+export type TransactionCategory = "order" | "manual" | "referral" | "signup" | "expiration" | "refund" | "other";
+export type TransactionStatus = "pending" | "completed" | "expired" | "cancelled" | "failed";
+
+export interface Transaction {
+  id: string;
+  customerId: string;
+  customerName?: string | null;
+  customerEmail?: string | null;
+  storeId: string;
+  channelId: number;
+  bcCustomerId: number;
+  type: TransactionType;
+  transactionCategory: TransactionCategory;
+  points: number; // Positive for earn, negative for redeem
+  description: string;
+  reason?: string | null;
+  status: TransactionStatus;
+  expiresAt?: Date | string | null;
+  notificationSent: boolean;
+  adminUserId?: string | null;
+  source: string;
+  metadata?: Record<string, any>;
+  relatedTransactionId?: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface TransactionsResponse {
+  success: boolean;
+  data: Transaction[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface TransactionResponse {
+  success: boolean;
+  data: Transaction;
+}
+
+export interface CreateTransactionRequest {
+  customerId: string;
+  storeId: string;
+  channelId: number;
+  type: TransactionType;
+  transactionCategory?: TransactionCategory;
+  points: number;
+  description: string;
+  reason?: string;
+  status?: TransactionStatus;
+  expiresAt?: Date | string;
+  adminUserId?: string;
+  source?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface CustomersResponse {
+  success: boolean;
+  data: Customer[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface FetchCustomersResponse {
+  success: boolean;
+  message: string;
+  data: {
+    totalFetched: number;
+    stored: number;
+    updated: number;
+    errors: number;
+    storeId: string;
+    channelId: number;
+  };
+}
+
+// Fetch customers from BigCommerce and store in database
+export async function fetchAndStoreCustomers(
+  storeId: string,
+  channelId: number
+): Promise<FetchCustomersResponse> {
+  console.log("📥 Fetching and storing customers:", { storeId, channelId });
+
+  const response = await fetchWithAuth(
+    `${API_URL}/api/customers/fetch?storeId=${storeId}&channelId=${channelId}`,
+    {
+      method: "POST",
+    }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error fetching and storing customers:", errorBody);
+    throw new Error(
+      errorBody.message ||
+        errorBody.error ||
+        "Failed to fetch and store customers"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Customers fetched and stored successfully:", result);
+  return result;
+}
+
+// Get customers from database
+export async function getCustomers(
+  storeId: string,
+  channelId: number,
+  page: number = 1,
+  limit: number = 50
+): Promise<CustomersResponse> {
+  console.log("📥 Fetching customers:", { storeId, channelId, page, limit });
+
+  // Validate required parameters
+  if (!storeId) {
+    throw new Error("Store ID is required");
+  }
+
+  if (channelId === undefined || channelId === null) {
+    throw new Error("Channel ID is required");
+  }
+
+  const queryParams = new URLSearchParams({
+    storeId,
+    channelId: channelId.toString(),
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+
+  try {
+    const response = await fetchWithAuth(
+      `${API_URL}/api/customers?${queryParams.toString()}`,
+      {
+        method: "GET",
+      }
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      console.error("❌ Error fetching customers:", errorBody);
+      throw new Error(
+        errorBody.message || errorBody.error || "Failed to fetch customers"
+      );
+    }
+
+    const result = await response.json();
+    console.log("✅ Customers fetched successfully:", result);
+    return result;
+  } catch (error: any) {
+    // Handle network errors
+    if (error.name === "TypeError" && error.message === "Failed to fetch") {
+      console.error("❌ Network error - Backend server may not be running or CORS issue");
+      throw new Error(
+        `Unable to connect to backend server at ${API_URL}. Please check if the backend server is running.`
+      );
+    }
+    throw error;
+  }
+}
+
+// Get single customer by ID
+export async function getCustomerById(
+  customerId: string
+): Promise<{ success: boolean; data: Customer }> {
+  console.log("📥 Fetching customer:", { customerId });
+
+  const response = await fetchWithAuth(
+    `${API_URL}/api/customers/${customerId}`,
+    {
+      method: "GET",
+    }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error fetching customer:", errorBody);
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to fetch customer"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Customer fetched successfully:", result);
+  return result;
+}
+
+// Transaction API Functions
+
+/**
+ * Get all transactions with filters
+ */
+export async function getTransactions(
+  storeId: string,
+  options?: {
+    channelId?: number;
+    customerId?: string;
+    type?: TransactionType;
+    status?: TransactionStatus;
+    transactionCategory?: TransactionCategory;
+    page?: number;
+    limit?: number;
+  }
+): Promise<TransactionsResponse> {
+  if (!storeId) {
+    throw new Error("storeId is required");
+  }
+
+  const params = new URLSearchParams({
+    storeId,
+    page: String(options?.page || 1),
+    limit: String(options?.limit || 50),
+  });
+
+  if (options?.channelId) {
+    params.append("channelId", String(options.channelId));
+  }
+  if (options?.customerId) {
+    params.append("customerId", options.customerId);
+  }
+  if (options?.type) {
+    params.append("type", options.type);
+  }
+  if (options?.status) {
+    params.append("status", options.status);
+  }
+  if (options?.transactionCategory) {
+    params.append("transactionCategory", options.transactionCategory);
+  }
+
+  const response = await fetchWithAuth(`${API_URL}/api/transactions?${params.toString()}`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.message || "Failed to fetch transactions");
+  }
+
+  return await response.json();
+}
+
+/**
+ * Get a single transaction by ID
+ */
+export async function getTransactionById(
+  transactionId: string
+): Promise<TransactionResponse> {
+  const response = await fetchWithAuth(
+    `${API_URL}/api/transactions/${transactionId}`,
+    {
+      method: "GET",
+    }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.message || "Failed to fetch transaction");
+  }
+
+  return await response.json();
+}
+
+/**
+ * Create a new transaction (for manual adjustments)
+ */
+export async function createTransaction(
+  transactionData: CreateTransactionRequest
+): Promise<TransactionResponse> {
+  const response = await fetchWithAuth(`${API_URL}/api/transactions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(transactionData),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.message || "Failed to create transaction");
+  }
+
+  return await response.json();
+}
+
+/**
+ * Get customer transaction history
+ */
+export async function getCustomerTransactions(
+  customerId: string,
+  options?: {
+    type?: TransactionType;
+    status?: TransactionStatus;
+    transactionCategory?: TransactionCategory;
+    page?: number;
+    limit?: number;
+  }
+): Promise<TransactionsResponse> {
+  if (!customerId) {
+    throw new Error("customerId is required");
+  }
+
+  const params = new URLSearchParams({
+    page: String(options?.page || 1),
+    limit: String(options?.limit || 50),
+  });
+
+  if (options?.type) {
+    params.append("type", options.type);
+  }
+  if (options?.status) {
+    params.append("status", options.status);
+  }
+  if (options?.transactionCategory) {
+    params.append("transactionCategory", options.transactionCategory);
+  }
+
+  const response = await fetchWithAuth(
+    `${API_URL}/api/transactions/customer/${customerId}?${params.toString()}`,
+    {
+      method: "GET",
+    }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.message || "Failed to fetch customer transactions");
+  }
+
+  return await response.json();
+}
+
+/**
+ * Recalculate customer tiers based on updated tier settings
+ * This is automatically called when tier settings are saved, but can be manually triggered if needed
+ */
+export async function recalculateCustomerTiers(
+  storeId: string,
+  channelId: string
+): Promise<{ success: boolean; message: string; data: { updated: number; unchanged: number; total: number } }> {
+  if (!storeId || !channelId) {
+    throw new Error("storeId and channelId are required");
+  }
+
+  const response = await fetchWithAuth(
+    `${API_URL}/api/customers/recalculate-tiers`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        storeId,
+        channelId,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.message || "Failed to recalculate customer tiers");
+  }
+
+  return await response.json();
+}
+
+/**
+ * Bulk import customer points from CSV data
+ */
+export interface BulkImportCustomer {
+  email: string;
+  points: number;
+}
+
+export interface BulkImportRequest {
+  storeId: string;
+  channelId: number;
+  importType: "add" | "reset";
+  customers: BulkImportCustomer[];
+}
+
+export interface BulkImportResponse {
+  success: boolean;
+  message: string;
+  data: {
+    total: number;
+    success: number;
+    failed: number;
+    notFound: number;
+    errors: Array<{
+      email: string;
+      error: string;
+    }>;
+  };
+}
+
+export async function bulkImportPoints(
+  request: BulkImportRequest
+): Promise<BulkImportResponse> {
+  const { storeId, channelId, importType, customers } = request;
+
+  if (!storeId || !channelId || !importType || !customers || !Array.isArray(customers)) {
+    throw new Error("Missing required fields: storeId, channelId, importType, customers");
+  }
+
+  const response = await fetchWithAuth(
+    `${API_URL}/api/transactions/bulk-import`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        storeId,
+        channelId,
+        importType,
+        customers,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.message || "Failed to import points");
+  }
+
+  return await response.json();
 }
