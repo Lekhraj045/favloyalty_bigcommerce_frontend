@@ -192,3 +192,7 @@ input:disabled {
     color: #8a8a8a;
     cursor: not-allowed;
 }
+
+.custom-thead::after {
+    height: 0;
+}
