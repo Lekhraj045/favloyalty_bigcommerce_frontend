@@ -1,18 +1,13 @@
 'use client'
 
 import { Slider } from "@heroui/slider";
-import { useState, useEffect } from 'react'
 
 interface PlanSliderAreaProps {
-    onOrdersChange?: (orders: number) => void;
-    onPriceChange?: (price: number) => void;
+    value: number;
+    onChange: (value: number) => void;
 }
 
-export default function PlanSliderArea({
-    onOrdersChange,
-    onPriceChange,
-}: PlanSliderAreaProps) {
-    const [value, setValue] = useState<number>(5100)
+export default function PlanSliderArea({ value, onChange }: PlanSliderAreaProps) {
     const minValue = 750;
     const maxValue = 10000;
     const step = 50;
@@ -30,15 +25,6 @@ export default function PlanSliderArea({
 
     const monthlyPrice = calculatePrice(value);
 
-    useEffect(() => {
-        if (onOrdersChange) {
-            onOrdersChange(value);
-        }
-        if (onPriceChange) {
-            onPriceChange(monthlyPrice);
-        }
-    }, [value, monthlyPrice, onOrdersChange, onPriceChange]);
-
     const handleChange = (val: number | number[]) => {
         let newValue: number;
         if (typeof val === 'number') {
@@ -50,7 +36,8 @@ export default function PlanSliderArea({
         }
         // Ensure value is always a multiple of 50
         const roundedValue = Math.round(newValue / step) * step;
-        setValue(Math.max(minValue, Math.min(maxValue, roundedValue)));
+        const clampedValue = Math.max(minValue, Math.min(maxValue, roundedValue));
+        onChange(clampedValue);
     };
 
     return (
