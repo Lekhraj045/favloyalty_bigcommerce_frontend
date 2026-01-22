@@ -1,3 +1,4 @@
+import SetupNavigation from "@/components/SetupNavigation";
 import { CheckBadgeIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { Button } from "@heroui/button";
 
@@ -37,7 +38,6 @@ export default function SetupBar() {
                   </span>
                 </div>
 
-                {/* Orange line example */}
                 <span className="absolute bottom-0 left-0 w-full h-[3px] bg-amber-500 rounded-b-lg"></span>
               </Button>
 
@@ -67,6 +67,8 @@ export default function SetupBar() {
             <Button className="custom-btn">Edit Setup</Button>
           </div>
         </div>
+
+        {/* <SetupNavigation /> */}
       </div>
     </div>
   );
