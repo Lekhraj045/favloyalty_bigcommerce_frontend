@@ -1,6 +1,5 @@
-import React from 'react';
-import { Check, X } from 'lucide-react';
 import { Button } from '@heroui/button';
+import { Check, X } from 'lucide-react';
 
 interface PricingPlanAreaProps {
   orderCount: number;

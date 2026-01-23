@@ -1,22 +1,268 @@
 "use client";
 
-import { Tabs, Tab } from "@heroui/tabs";
-import { Card, CardBody } from "@heroui/card";
+import { useEffect, useState, useCallback } from "react";
+import { Button } from "@heroui/button";
 import { DateRangePicker } from "@heroui/date-picker";
 import { Divider } from "@heroui/divider";
-import Image from "next/image";
+import { Tab, Tabs } from "@heroui/tabs";
+import { DateValue, CalendarDate, today } from "@internationalized/date";
 import { ArrowDown, ArrowUp, MoveHorizontal, } from "lucide-react";
+import Image from "next/image";
 import CampaignTableArea from "./CampaignTable";
-import { DateValue } from "@internationalized/date";
-import { Button } from "@heroui/button";
+import { useAppSelector } from "@/store/hooks";
+import { 
+  getCustomers, 
+  getStoreId, 
+  type Customer,
+  getPointsAwardedStats,
+  type PointsAwardedStat 
+} from "@/utils/api";
+
+interface TierCounts {
+  tierIndex0: number;
+  tierIndex1: number;
+  tierIndex2: number;
+  newTierIndex0: number;
+  newTierIndex1: number;
+  newTierIndex2: number;
+}
+
+// Calculate default date range: 15 days ago to today
+const getDefaultDateRange = (): { start: DateValue; end: DateValue } => {
+  const todayDate = today("UTC");
+  const fifteenDaysAgo = todayDate.subtract({ days: 15 });
+  return {
+    start: fifteenDaysAgo,
+    end: todayDate,
+  };
+};
 
 export default function DashLayout() {
+  const selectedChannel = useAppSelector(
+    (state) => state.channel.selectedChannel
+  );
+
+  const [dateRange, setDateRange] = useState<{
+    start: DateValue | null;
+    end: DateValue | null;
+  }>(getDefaultDateRange());
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [newCustomers, setNewCustomers] = useState<Customer[]>([]);
+  const [tierCounts, setTierCounts] = useState<TierCounts>({
+    tierIndex0: 0,
+    tierIndex1: 0,
+    tierIndex2: 0,
+    newTierIndex0: 0,
+    newTierIndex1: 0,
+    newTierIndex2: 0,
+  });
+  const [loading, setLoading] = useState(false);
+  const [pointsAwardedStats, setPointsAwardedStats] = useState<PointsAwardedStat[]>([]);
+  const [totalPointsAwarded, setTotalPointsAwarded] = useState(0);
+  const [pointsLoading, setPointsLoading] = useState(false);
+
   const today = new Date();
   today.setHours(23, 59, 59, 999); // Set to end of today
 
   const isDateUnavailable = (date: DateValue) => {
     const dateObj = date.toDate ? date.toDate("UTC") : new Date(date.toString());
     return dateObj > today;
+  };
+
+  // Fetch all customers for the selected channel
+  const fetchAllCustomers = useCallback(async () => {
+    if (!selectedChannel?.channel_id) {
+      setCustomers([]);
+      setNewCustomers([]);
+      setTierCounts({
+        tierIndex0: 0,
+        tierIndex1: 0,
+        tierIndex2: 0,
+        newTierIndex0: 0,
+        newTierIndex1: 0,
+        newTierIndex2: 0,
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const storeId = getStoreId();
+      if (!storeId) {
+        console.error("Store ID not found");
+        return;
+      }
+
+      // Fetch all customers (without pagination limit)
+      const allCustomers: Customer[] = [];
+      let page = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await getCustomers(
+          storeId,
+          selectedChannel.channel_id,
+          page,
+          100 // Fetch 100 per page
+        );
+
+        if (response.data && response.data.length > 0) {
+          allCustomers.push(...response.data);
+          page++;
+          hasMore = response.pagination.page < response.pagination.totalPages;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      setCustomers(allCustomers);
+
+      // Filter new customers based on date range
+      let filteredNewCustomers: Customer[] = [];
+      if (dateRange.start && dateRange.end) {
+        const startDate = dateRange.start.toDate ? dateRange.start.toDate("UTC") : new Date(dateRange.start.toString());
+        const endDate = dateRange.end.toDate ? dateRange.end.toDate("UTC") : new Date(dateRange.end.toString());
+        endDate.setHours(23, 59, 59, 999); // Set to end of day
+
+        filteredNewCustomers = allCustomers.filter((customer) => {
+          const customerDate = customer.createdAt
+            ? new Date(customer.createdAt)
+            : customer.joiningDate
+            ? new Date(customer.joiningDate)
+            : null;
+
+          if (!customerDate) return false;
+
+          return customerDate >= startDate && customerDate <= endDate;
+        });
+      }
+
+      setNewCustomers(filteredNewCustomers);
+
+      // Calculate tier counts
+      const counts: TierCounts = {
+        tierIndex0: 0,
+        tierIndex1: 0,
+        tierIndex2: 0,
+        newTierIndex0: 0,
+        newTierIndex1: 0,
+        newTierIndex2: 0,
+      };
+
+      // Count all customers by tier
+      allCustomers.forEach((customer) => {
+        const tierIndex = customer.currentTier?.tierIndex ?? 0;
+        if (tierIndex === 0) {
+          counts.tierIndex0++;
+        } else if (tierIndex === 1) {
+          counts.tierIndex1++;
+        } else if (tierIndex === 2) {
+          counts.tierIndex2++;
+        }
+      });
+
+      // Count new customers by tier
+      filteredNewCustomers.forEach((customer) => {
+        const tierIndex = customer.currentTier?.tierIndex ?? 0;
+        if (tierIndex === 0) {
+          counts.newTierIndex0++;
+        } else if (tierIndex === 1) {
+          counts.newTierIndex1++;
+        } else if (tierIndex === 2) {
+          counts.newTierIndex2++;
+        }
+      });
+
+      setTierCounts(counts);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedChannel?.channel_id, dateRange]);
+
+  // Fetch points awarded statistics
+  const fetchPointsAwardedStats = useCallback(async () => {
+    if (!selectedChannel?.channel_id || !dateRange.start || !dateRange.end) {
+      setPointsAwardedStats([]);
+      setTotalPointsAwarded(0);
+      return;
+    }
+
+    setPointsLoading(true);
+    try {
+      const storeId = getStoreId();
+      if (!storeId) {
+        console.error("Store ID not found");
+        return;
+      }
+
+      const startDate = dateRange.start.toDate ? dateRange.start.toDate("UTC") : new Date(dateRange.start.toString());
+      const endDate = dateRange.end.toDate ? dateRange.end.toDate("UTC") : new Date(dateRange.end.toString());
+      endDate.setHours(23, 59, 59, 999);
+
+      const response = await getPointsAwardedStats(
+        storeId,
+        selectedChannel.channel_id,
+        startDate.toISOString(),
+        endDate.toISOString()
+      );
+
+      if (response.success && response.data) {
+        setPointsAwardedStats(response.data.stats);
+        setTotalPointsAwarded(response.data.totalPointsAwarded);
+      }
+    } catch (error) {
+      console.error("Error fetching points awarded stats:", error);
+      setPointsAwardedStats([]);
+      setTotalPointsAwarded(0);
+    } finally {
+      setPointsLoading(false);
+    }
+  }, [selectedChannel?.channel_id, dateRange]);
+
+  // Fetch customers when channel or date range changes
+  useEffect(() => {
+    fetchAllCustomers();
+  }, [fetchAllCustomers]);
+
+  // Fetch points awarded stats when channel or date range changes
+  useEffect(() => {
+    fetchPointsAwardedStats();
+  }, [fetchPointsAwardedStats]);
+
+  const totalMembers = customers.length;
+  const newMembers = newCustomers.length;
+
+  // Helper function to get stats for a transaction type
+  const getStatForTransaction = (transactionName: string): PointsAwardedStat | null => {
+    return pointsAwardedStats.find((stat) => stat.transactionName === transactionName) || null;
+  };
+
+  // Calculate currency value (assuming 1000 points = 1 currency unit)
+  const pointsToCurrency = (points: number): number => {
+    return points / 1000;
+  };
+
+  // Helper to render growth indicator
+  const renderGrowthIndicator = (growth: number) => {
+    if (growth > 0) {
+      return (
+        <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
+          <span>{Math.abs(growth).toFixed(0)}%</span>
+          <span><ArrowUp strokeWidth={3} className="w-3 h-3 text-white" /></span>
+        </div>
+      );
+    } else if (growth < 0) {
+      return (
+        <div className="flex items-center gap-1 bg-[#F95353] text-white px-2 py-0.5 rounded-full text-xs">
+          <span>{Math.abs(growth).toFixed(0)}%</span>
+          <span><ArrowDown strokeWidth={3} className="w-3 h-3 text-white" /></span>
+        </div>
+      );
+    } else {
+      return <MoveHorizontal className="w-4 h-4 text-[#303030]" />;
+    }
   };
   return (
     <>
@@ -48,6 +294,22 @@ export default function DashLayout() {
                   visibleMonths={2}
                   variant="bordered"
                   isDateUnavailable={isDateUnavailable}
+                  value={
+                    dateRange.start && dateRange.end
+                      ? { start: dateRange.start, end: dateRange.end }
+                      : null
+                  }
+                  onChange={(range) => {
+                    if (range && range.start && range.end) {
+                      setDateRange({
+                        start: range.start,
+                        end: range.end,
+                      });
+                    } else {
+                      // Reset to default 15 days range if cleared
+                      setDateRange(getDefaultDateRange());
+                    }
+                  }}
                   classNames={{
                     inputWrapper: "border border-[#EBEBEB] bg-white focus:ring-0 focus:border-[#EBEBEB] cursor-pointer",
                     input: "cursor-pointer",
@@ -68,7 +330,7 @@ export default function DashLayout() {
                             Total Members:
                           </span>
                           <span className="text-base font-bold text-[#219653]">
-                            20
+                            {loading ? "..." : totalMembers}
                           </span>
                         </div>
 
@@ -79,47 +341,69 @@ export default function DashLayout() {
                             New Members:
                           </span>
                           <span className="text-base font-bold text-[#303030]">
-                            1
+                            {loading ? "..." : newMembers}
                           </span>
                         </div>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-4">
-                      {/* Bronze Tier */}
+                      {/* Bronze Tier (tierIndex 0) */}
                       <div className="card">
                         <div className="flex flex-col gap-2">
                           <span className="text-sm font-bold text-[#303030]">Bronze</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">0</span>
-                            <span className="text-sm text-gray-500">
-                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            <span className="text-xl font-bold text-[#303030]">
+                              {loading ? "..." : tierCounts.tierIndex0}
                             </span>
+                            {tierCounts.newTierIndex0 > 0 ? (
+                              <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
+                                <span>{tierCounts.newTierIndex0}</span>
+                                <span><ArrowUp strokeWidth={3} className="w-3 h-3 text-white" /></span>
+                              </div>
+                            ) : (
+                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            )}
                           </div>
                         </div>
                       </div>
 
-                      {/* Silver Tier */}
+                      {/* Silver Tier (tierIndex 1) */}
                       <div className="card">
                         <div className="flex flex-col gap-2">
                           <span className="text-sm font-bold text-[#303030]">Silver</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">0</span>
-                            <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            <span className="text-xl font-bold text-[#303030]">
+                              {loading ? "..." : tierCounts.tierIndex1}
+                            </span>
+                            {tierCounts.newTierIndex1 > 0 ? (
+                              <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
+                                <span>{tierCounts.newTierIndex1}</span>
+                                <span><ArrowUp strokeWidth={3} className="w-3 h-3 text-white" /></span>
+                              </div>
+                            ) : (
+                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            )}
                           </div>
                         </div>
                       </div>
 
-                      {/* Gold Tier */}
+                      {/* Gold Tier (tierIndex 2) */}
                       <div className="card">
                         <div className="flex flex-col gap-2">
                           <span className="text-sm font-bold text-[#303030]">Gold</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">20</span>
-                            <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
-                              <span>1</span>
-                              <span><ArrowUp strokeWidth={3} className="w-3 h-3 text-white" /></span>
-                            </div>
+                            <span className="text-xl font-bold text-[#303030]">
+                              {loading ? "..." : tierCounts.tierIndex2}
+                            </span>
+                            {tierCounts.newTierIndex2 > 0 ? (
+                              <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
+                                <span>{tierCounts.newTierIndex2}</span>
+                                <span><ArrowUp strokeWidth={3} className="w-3 h-3 text-white" /></span>
+                              </div>
+                            ) : (
+                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            )}
                           </div>
                         </div>
                       </div>
@@ -134,11 +418,13 @@ export default function DashLayout() {
                           Points Awarded:
                         </span>
                         <span className="text-base font-bold text-[#219653]">
-                          8200
+                          {pointsLoading ? "..." : totalPointsAwarded.toLocaleString()}
                         </span>
                       </div>
                       <div className="text-sm text-[#303030]">
-                        <span className="font-bold">8200 = Rs. 8.20</span>
+                        <span className="font-bold">
+                          {pointsLoading ? "..." : `${totalPointsAwarded.toLocaleString()} = Rs. ${pointsToCurrency(totalPointsAwarded).toFixed(2)}`}
+                        </span>
                       </div>
                     </div>
 
@@ -156,11 +442,15 @@ export default function DashLayout() {
                             <span className="text-sm font-bold">Sign Up Bonus</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">100</span>
-                            <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
-                              <span>100%</span>
-                              <span><ArrowUp strokeWidth={3} className="w-3 h-3 text-white" /></span>
-                            </div>
+                            <span className="text-xl font-bold text-[#303030]">
+                              {pointsLoading ? "..." : (getStatForTransaction("Sign Up Bonus")?.totalPointsCurrent || 0).toLocaleString()}
+                            </span>
+                            {!pointsLoading && getStatForTransaction("Sign Up Bonus") && 
+                              renderGrowthIndicator(getStatForTransaction("Sign Up Bonus")!.growth)
+                            }
+                            {!pointsLoading && !getStatForTransaction("Sign Up Bonus") && 
+                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            }
                           </div>
                         </div>
                       </div>
@@ -178,8 +468,15 @@ export default function DashLayout() {
                             <span className="text-sm font-bold">Referral</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">0</span>
-                            <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            <span className="text-xl font-bold text-[#303030]">
+                              {pointsLoading ? "..." : (getStatForTransaction("Referral")?.totalPointsCurrent || 0).toLocaleString()}
+                            </span>
+                            {!pointsLoading && getStatForTransaction("Referral") && 
+                              renderGrowthIndicator(getStatForTransaction("Referral")!.growth)
+                            }
+                            {!pointsLoading && !getStatForTransaction("Referral") && 
+                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            }
                           </div>
                         </div>
                       </div>
@@ -197,8 +494,15 @@ export default function DashLayout() {
                             <span className="text-sm font-bold">Purchase Product</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">0</span>
-                            <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            <span className="text-xl font-bold text-[#303030]">
+                              {pointsLoading ? "..." : (getStatForTransaction("Purchase Product")?.totalPointsCurrent || 0).toLocaleString()}
+                            </span>
+                            {!pointsLoading && getStatForTransaction("Purchase Product") && 
+                              renderGrowthIndicator(getStatForTransaction("Purchase Product")!.growth)
+                            }
+                            {!pointsLoading && !getStatForTransaction("Purchase Product") && 
+                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            }
                           </div>
                         </div>
                       </div>
@@ -216,11 +520,15 @@ export default function DashLayout() {
                             <span className="text-sm font-bold">Birthday Celebration</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">20</span>
-                            <div className="flex items-center gap-1 bg-[#F95353] text-white px-2 py-0.5 rounded-full text-xs">
-                              <span>100%</span>
-                              <span><ArrowDown strokeWidth={3} className="w-3 h-3 text-white" /></span>
-                            </div>
+                            <span className="text-xl font-bold text-[#303030]">
+                              {pointsLoading ? "..." : (getStatForTransaction("Birthday Celebration")?.totalPointsCurrent || 0).toLocaleString()}
+                            </span>
+                            {!pointsLoading && getStatForTransaction("Birthday Celebration") && 
+                              renderGrowthIndicator(getStatForTransaction("Birthday Celebration")!.growth)
+                            }
+                            {!pointsLoading && !getStatForTransaction("Birthday Celebration") && 
+                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            }
                           </div>
                         </div>
                       </div>
@@ -238,8 +546,15 @@ export default function DashLayout() {
                             <span className="text-sm font-bold">Newsletter Bonus</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">0</span>
-                            <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            <span className="text-xl font-bold text-[#303030]">
+                              {pointsLoading ? "..." : (getStatForTransaction("Newsletter Bonus")?.totalPointsCurrent || 0).toLocaleString()}
+                            </span>
+                            {!pointsLoading && getStatForTransaction("Newsletter Bonus") && 
+                              renderGrowthIndicator(getStatForTransaction("Newsletter Bonus")!.growth)
+                            }
+                            {!pointsLoading && !getStatForTransaction("Newsletter Bonus") && 
+                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            }
                           </div>
                         </div>
                       </div>
@@ -257,8 +572,15 @@ export default function DashLayout() {
                             <span className="text-sm font-bold">Profile Completion</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">0</span>
-                            <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            <span className="text-xl font-bold text-[#303030]">
+                              {pointsLoading ? "..." : (getStatForTransaction("Profile Completion")?.totalPointsCurrent || 0).toLocaleString()}
+                            </span>
+                            {!pointsLoading && getStatForTransaction("Profile Completion") && 
+                              renderGrowthIndicator(getStatForTransaction("Profile Completion")!.growth)
+                            }
+                            {!pointsLoading && !getStatForTransaction("Profile Completion") && 
+                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            }
                           </div>
                         </div>
                       </div>
@@ -276,11 +598,15 @@ export default function DashLayout() {
                             <span className="text-sm font-bold">Event Celebration</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">8000</span>
-                            <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
-                              <span>61%</span>
-                              <span><ArrowUp strokeWidth={3} className="w-3 h-3 text-white" /></span>
-                            </div>
+                            <span className="text-xl font-bold text-[#303030]">
+                              {pointsLoading ? "..." : (getStatForTransaction("Event Celebration")?.totalPointsCurrent || 0).toLocaleString()}
+                            </span>
+                            {!pointsLoading && getStatForTransaction("Event Celebration") && 
+                              renderGrowthIndicator(getStatForTransaction("Event Celebration")!.growth)
+                            }
+                            {!pointsLoading && !getStatForTransaction("Event Celebration") && 
+                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            }
                           </div>
                         </div>
                       </div>
@@ -298,8 +624,15 @@ export default function DashLayout() {
                             <span className="text-sm font-bold">Rejoin Bonus</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">0</span>
-                            <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            <span className="text-xl font-bold text-[#303030]">
+                              {pointsLoading ? "..." : (getStatForTransaction("Rejoin Bonus")?.totalPointsCurrent || 0).toLocaleString()}
+                            </span>
+                            {!pointsLoading && getStatForTransaction("Rejoin Bonus") && 
+                              renderGrowthIndicator(getStatForTransaction("Rejoin Bonus")!.growth)
+                            }
+                            {!pointsLoading && !getStatForTransaction("Rejoin Bonus") && 
+                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            }
                           </div>
                         </div>
                       </div>

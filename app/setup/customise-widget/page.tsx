@@ -172,14 +172,23 @@ function CustomiseWidgetContent() {
         }
 
         // Check if page is completed: Brand colors, Background Pattern, and Widget Icon are selected
-        const isPageCompleted: boolean = !!(
-          state.widgetBgColor &&
-          state.widgetBgColor.trim() !== "" &&
-          state.selectedPattern !== null &&
-          state.selectedPattern !== "none" &&
-          state.selectedWidgetIcon &&
-          state.selectedWidgetIcon.trim() !== ""
-        );
+        // Note: "none" is a valid background pattern selection - any selection (including "none") means the page is complete
+        // A pattern is considered selected if it's a non-empty string (including "none")
+        const hasValidBgColor = !!(state.widgetBgColor && state.widgetBgColor.trim() !== "");
+        // Check that selectedPattern is a truthy string value (this includes "none", "pattern1", etc.)
+        const hasValidPattern = typeof state.selectedPattern === "string" && state.selectedPattern.trim() !== "";
+        const hasValidWidgetIcon = !!(state.selectedWidgetIcon && state.selectedWidgetIcon.trim() !== "");
+        
+        const isPageCompleted: boolean = hasValidBgColor && hasValidPattern && hasValidWidgetIcon;
+        
+        console.log("Page completion check:", {
+          hasValidBgColor,
+          hasValidPattern,
+          hasValidWidgetIcon,
+          selectedPattern: state.selectedPattern,
+          selectedPatternType: typeof state.selectedPattern,
+          isPageCompleted
+        });
 
         // Update page completion status
         if (channelId) {

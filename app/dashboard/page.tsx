@@ -5,8 +5,17 @@ import { Button } from "@heroui/button";
 import DashLayout from "./components/dash-layout";
 import SetupBar from "./components/setup-bar";
 import WhyWidgetDisable from "./components/why-widget-disbale";
+import { useAppSelector } from "@/store/hooks";
 
 export default function DashboardPage() {
+  const selectedChannel = useAppSelector(
+    (state) => state.channel.selectedChannel
+  );
+
+  // Show the card when setupprogress is null, undefined, or less than 4
+  const shouldShowWidgetDisabledCard =
+    selectedChannel?.setupprogress == null || selectedChannel.setupprogress < 4;
+
   return (
     <>
       <div className="max-w-5xl mx-auto">
@@ -24,7 +33,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <WhyWidgetDisable />
+          {shouldShowWidgetDisabledCard && <WhyWidgetDisable />}
 
           <SetupBar />
 

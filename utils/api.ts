@@ -1914,3 +1914,62 @@ export async function bulkImportPoints(
 
   return await response.json();
 }
+
+// Points Awarded Statistics Types
+export interface PointsAwardedStat {
+  transactionName: string;
+  totalPointsCurrent: number;
+  totalPointsPrevious: number;
+  growth: number;
+}
+
+export interface PointsAwardedStatsResponse {
+  success: boolean;
+  data: {
+    totalPointsAwarded: number;
+    stats: PointsAwardedStat[];
+  };
+}
+
+// Get points awarded statistics for dashboard
+export async function getPointsAwardedStats(
+  storeId: string,
+  channelId: number,
+  startDate: string,
+  endDate: string
+): Promise<PointsAwardedStatsResponse> {
+  console.log("📥 Fetching points awarded stats:", {
+    storeId,
+    channelId,
+    startDate,
+    endDate,
+  });
+
+  const queryParams = new URLSearchParams({
+    storeId,
+    channelId: channelId.toString(),
+    startDate,
+    endDate,
+  });
+
+  const response = await fetchWithAuth(
+    `${API_URL}/api/transactions/points-awarded-stats?${queryParams.toString()}`,
+    {
+      method: "GET",
+    }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error fetching points awarded stats:", errorBody);
+    throw new Error(
+      errorBody.message ||
+        errorBody.error ||
+        "Failed to fetch points awarded statistics"
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Points awarded stats fetched successfully:", result);
+  return result;
+}
