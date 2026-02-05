@@ -174,20 +174,27 @@ function CustomiseWidgetContent() {
         // Check if page is completed: Brand colors, Background Pattern, and Widget Icon are selected
         // Note: "none" is a valid background pattern selection - any selection (including "none") means the page is complete
         // A pattern is considered selected if it's a non-empty string (including "none")
-        const hasValidBgColor = !!(state.widgetBgColor && state.widgetBgColor.trim() !== "");
+        const hasValidBgColor = !!(
+          state.widgetBgColor && state.widgetBgColor.trim() !== ""
+        );
         // Check that selectedPattern is a truthy string value (this includes "none", "pattern1", etc.)
-        const hasValidPattern = typeof state.selectedPattern === "string" && state.selectedPattern.trim() !== "";
-        const hasValidWidgetIcon = !!(state.selectedWidgetIcon && state.selectedWidgetIcon.trim() !== "");
-        
-        const isPageCompleted: boolean = hasValidBgColor && hasValidPattern && hasValidWidgetIcon;
-        
+        const hasValidPattern =
+          typeof state.selectedPattern === "string" &&
+          state.selectedPattern.trim() !== "";
+        const hasValidWidgetIcon = !!(
+          state.selectedWidgetIcon && state.selectedWidgetIcon.trim() !== ""
+        );
+
+        const isPageCompleted: boolean =
+          hasValidBgColor && hasValidPattern && hasValidWidgetIcon;
+
         console.log("Page completion check:", {
           hasValidBgColor,
           hasValidPattern,
           hasValidWidgetIcon,
           selectedPattern: state.selectedPattern,
           selectedPatternType: typeof state.selectedPattern,
-          isPageCompleted
+          isPageCompleted,
         });
 
         // Update page completion status
@@ -278,7 +285,7 @@ function CustomiseWidgetContent() {
             <div className="flex flex-col gap-4">
               <div className="flex justify-between items-center gap-6">
                 <div className="flex flex-col gap-1">
-                  <h2 className="text-base font-bold">Customise Widget</h2>
+                  <h2 className="text-base font-bold">Customize Widget</h2>
                 </div>
               </div>
 

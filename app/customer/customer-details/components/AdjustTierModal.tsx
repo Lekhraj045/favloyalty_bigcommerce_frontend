@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { updateCustomerTier } from "@/utils/api";
 import { Button } from "@heroui/button";
 import {
   Modal,
@@ -9,42 +9,92 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@heroui/modal";
+import { useEffect, useState } from "react";
+
+interface TierOption {
+  tierIndex: number;
+  tierName: string;
+}
 
 interface AdjustTierModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentTier?: string;
+  customerId: string;
+  currentTierIndex: number;
+  currentTierDisplay?: string;
+  tierOptions: { maxTierIndex: number; tiers: TierOption[] } | null;
+  onSuccess: () => void;
 }
 
 export default function AdjustTierModal({
   isOpen,
   onClose,
-  currentTier = "Silver",
+  customerId,
+  currentTierIndex,
+  currentTierDisplay = "Silver",
+  tierOptions,
+  onSuccess,
 }: AdjustTierModalProps) {
-  const [selectedTier, setSelectedTier] = useState<string>(currentTier);
-  const [selectedReason, setSelectedReason] = useState<string>("adjustment-customer-service");
+  // Only tiers higher than current (upgrade only)
+  const upgradeableTiers =
+    tierOptions?.tiers.filter((t) => t.tierIndex > currentTierIndex) ?? [];
+  const defaultSelected =
+    upgradeableTiers.length > 0
+      ? upgradeableTiers[0].tierIndex
+      : currentTierIndex;
 
-  const tiers = [
-    { value: "Silver", label: "Silver" },
-    { value: "Gold", label: "Gold" },
-    { value: "Platinum", label: "Platinum" },
-  ];
+  const [selectedTierIndex, setSelectedTierIndex] =
+    useState<number>(defaultSelected);
+  const [selectedReason, setSelectedReason] = useState<string>(
+    "adjustment-customer-service",
+  );
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const reasons = [
-    { value: "adjustment-customer-service", label: "Adjustment for customer service purposes" },
+    {
+      value: "adjustment-customer-service",
+      label: "Adjustment for customer service purposes",
+    },
     { value: "promotional-bonus", label: "Awarding promotional bonus points" },
     { value: "correction-error", label: "Correction of previous points error" },
     { value: "upgrading-tier", label: "Upgrading loyalty program tier" },
     { value: "other", label: "Other" },
   ];
 
-
+  useEffect(() => {
+    if (isOpen && upgradeableTiers.length > 0) {
+      setSelectedTierIndex(upgradeableTiers[0].tierIndex);
+      setError(null);
+    }
+  }, [isOpen, upgradeableTiers]);
 
   const handleClose = () => {
     onClose();
-    // Reset form
-    setSelectedTier(currentTier);
     setSelectedReason("adjustment-customer-service");
+    setError(null);
+    if (upgradeableTiers.length > 0) {
+      setSelectedTierIndex(upgradeableTiers[0].tierIndex);
+    }
+  };
+
+  const handleUpgrade = async () => {
+    if (selectedTierIndex <= currentTierIndex) {
+      setError("You can only upgrade to a higher tier.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await updateCustomerTier(customerId, selectedTierIndex);
+      onSuccess();
+      handleClose();
+    } catch (err) {
+      console.error("Error updating tier:", err);
+      setError(err instanceof Error ? err.message : "Failed to update tier");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -61,35 +111,40 @@ export default function AdjustTierModal({
       onClose={handleClose}
     >
       <ModalContent>
-        {(onClose) => (
+        {() => (
           <>
             <ModalHeader className="flex flex-col gap-1">
-              <h2 className="text-sm font-bold">Adjust Tier</h2>
+              <h2 className="text-sm font-bold">Change Tier (Upgrade Only)</h2>
             </ModalHeader>
             <ModalBody>
               <div className="space-y-4">
-                {/* Select Tier to Adjust */}
+                <p className="text-[13px] text-gray-600">
+                  Current tier: <strong>{currentTierDisplay}</strong>. You can
+                  only upgrade to a higher tier.
+                </p>
+                {/* Select tier to upgrade to */}
                 <div className="w-full custom-dropi relative">
                   <label className="block mb-1 text-[13px] text-gray-700">
-                    Select Tier to Adjust
+                    Select new tier
                   </label>
                   <select
-                    value={selectedTier}
-                    onChange={(e) => setSelectedTier(e.target.value)}
+                    value={selectedTierIndex}
+                    onChange={(e) =>
+                      setSelectedTierIndex(Number(e.target.value))
+                    }
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    {tiers.map((tier) => (
-                      <option key={tier.value} value={tier.value}>
-                        {tier.label}
+                    {upgradeableTiers.map((tier) => (
+                      <option key={tier.tierIndex} value={tier.tierIndex}>
+                        {tier.tierName}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Choose Reason to Change */}
                 <div className="w-full custom-dropi relative">
                   <label className="block mb-1 text-[13px] text-gray-700">
-                    Choose Reason to Change
+                    Reason for change
                   </label>
                   <select
                     value={selectedReason}
@@ -103,14 +158,23 @@ export default function AdjustTierModal({
                     ))}
                   </select>
                 </div>
+
+                {error && <p className="text-sm text-red-600">{error}</p>}
               </div>
             </ModalBody>
             <ModalFooter>
-              <Button className="custom-btn-default" onPress={handleClose}>
+              <Button
+                className="custom-btn-default"
+                onPress={handleClose}
+                isDisabled={submitting}
+              >
                 Cancel
               </Button>
               <Button
                 className="custom-btn"
+                onPress={handleUpgrade}
+                isLoading={submitting}
+                isDisabled={submitting || upgradeableTiers.length === 0}
               >
                 Upgrade Tier
               </Button>

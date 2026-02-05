@@ -57,7 +57,7 @@ export interface WaysToEarnSettings {
 
 export interface EventFormData {
   name: string;
+  customEventName?: string;
   date: DateValue | null;
   points: string;
 }
-

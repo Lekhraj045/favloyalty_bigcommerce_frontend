@@ -2,12 +2,12 @@ import type { RedeemCoupon } from "@/utils/api";
 import type { Selection } from "@heroui/react";
 import { Switch } from "@heroui/switch";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableColumn,
-    TableHeader,
-    TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableHeader,
+  TableRow,
 } from "@heroui/table";
 import { Tooltip } from "@heroui/tooltip";
 import { SquarePen, Trash2 } from "lucide-react";
@@ -72,6 +72,23 @@ const getCouponDisplayName = (coupon: RedeemCoupon): string => {
     return `${coupon.coupon.value}% off`;
   }
   return formatRedeemType(coupon.redeemType);
+};
+
+// Helper to get display points (for freeProduct use coupon.value or min of product points)
+const getDisplayPoints = (coupon: RedeemCoupon): number => {
+  const value = coupon.coupon?.value;
+  if (coupon.redeemType === "freeProduct") {
+    if (value != null && value > 0) return value;
+    const items = coupon.coupon?.restriction?.selectedItems?.items;
+    if (items?.length) {
+      const points = items
+        .map((i) => parseInt(String(i.pointRequired || "0"), 10))
+        .filter((n) => !isNaN(n) && n > 0);
+      if (points.length) return Math.min(...points);
+    }
+    return 0;
+  }
+  return value ?? 0;
 };
 
 // Helper function to get expiry days display
@@ -272,7 +289,7 @@ export default function WaysRedeemTable({
           {validCoupons.map((coupon) => {
             const couponName = getCouponDisplayName(coupon);
             const redeemType = formatRedeemType(coupon.redeemType);
-            const points = coupon.coupon?.value || 0;
+            const points = getDisplayPoints(coupon);
             const expiryDays = getExpiryDays(coupon);
             const isActive = coupon.coupon?.active || false;
             const iconPath = getRedeemTypeIcon(coupon.redeemType);
@@ -289,9 +306,11 @@ export default function WaysRedeemTable({
               <TableRow key={rowKey}>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <div className={`border border-[#DEDEDE] rounded-lg p-2 w-10 h-10 max-w-10 max-h-10 flex items-center justify-center relative ${
-                      isPremium ? "opacity-60 blur-[0.5px]" : ""
-                    }`}>
+                    <div
+                      className={`border border-[#DEDEDE] rounded-lg p-2 w-10 h-10 max-w-10 max-h-10 flex items-center justify-center relative ${
+                        isPremium ? "opacity-60 blur-[0.5px]" : ""
+                      }`}
+                    >
                       <Image
                         src={iconPath}
                         width={24}
@@ -311,23 +330,41 @@ export default function WaysRedeemTable({
                         </div>
                       )}
                     </div>
-                    <span className={`font-bold ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}>{couponName}</span>
+                    <span
+                      className={`font-bold ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}
+                    >
+                      {couponName}
+                    </span>
                   </div>
                 </TableCell>
 
                 <TableCell>
-                  <span className={`font-bold ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}>{points} Points</span>
+                  <span
+                    className={`font-bold ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}
+                  >
+                    {points} Points
+                  </span>
                 </TableCell>
 
                 <TableCell>
-                  <span className={isPremium ? "opacity-60 blur-[0.5px]" : ""}>{redeemType}</span>
+                  <span className={isPremium ? "opacity-60 blur-[0.5px]" : ""}>
+                    {redeemType}
+                  </span>
                 </TableCell>
 
                 <TableCell>
                   {expiryDays ? (
-                    <span className={`font-bold ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}>{expiryDays}</span>
+                    <span
+                      className={`font-bold ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}
+                    >
+                      {expiryDays}
+                    </span>
                   ) : (
-                    <span className={`text-gray-400 ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}>No expiry</span>
+                    <span
+                      className={`text-gray-400 ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}
+                    >
+                      No expiry
+                    </span>
                   )}
                 </TableCell>
 
@@ -338,7 +375,9 @@ export default function WaysRedeemTable({
                         if (isPremium) {
                           e.preventDefault();
                           e.stopPropagation();
-                          const featureName = formatRedeemType(coupon.redeemType);
+                          const featureName = formatRedeemType(
+                            coupon.redeemType
+                          );
                           if (onPremiumClick) {
                             onPremiumClick(featureName);
                           }
@@ -351,10 +390,16 @@ export default function WaysRedeemTable({
                         size="sm"
                         classNames={{
                           wrapper: "group-data-[selected=true]:bg-green-500",
-                          base: isPremium ? "opacity-50 cursor-not-allowed" : "",
+                          base: isPremium
+                            ? "opacity-50 cursor-not-allowed"
+                            : "",
                         }}
                         onValueChange={() => {
-                          handleToggleCoupon(coupon._id, isActive, coupon.redeemType);
+                          handleToggleCoupon(
+                            coupon._id,
+                            isActive,
+                            coupon.redeemType
+                          );
                         }}
                         isDisabled={isPremium}
                       />

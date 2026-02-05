@@ -1,22 +1,23 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useAppSelector } from "@/store/hooks";
+import {
+  getCustomers,
+  getPointsAwardedStats,
+  getStoreId,
+  type Customer,
+  type PointsAwardedStat,
+} from "@/utils/api";
 import { Button } from "@heroui/button";
 import { DateRangePicker } from "@heroui/date-picker";
 import { Divider } from "@heroui/divider";
 import { Tab, Tabs } from "@heroui/tabs";
-import { DateValue, CalendarDate, today } from "@internationalized/date";
-import { ArrowDown, ArrowUp, MoveHorizontal, } from "lucide-react";
+import { DateValue, today } from "@internationalized/date";
+import { ArrowDown, ArrowUp, MoveHorizontal } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import CampaignTableArea from "./CampaignTable";
-import { useAppSelector } from "@/store/hooks";
-import { 
-  getCustomers, 
-  getStoreId, 
-  type Customer,
-  getPointsAwardedStats,
-  type PointsAwardedStat 
-} from "@/utils/api";
 
 interface TierCounts {
   tierIndex0: number;
@@ -38,8 +39,12 @@ const getDefaultDateRange = (): { start: DateValue; end: DateValue } => {
 };
 
 export default function DashLayout() {
+  const router = useRouter();
   const selectedChannel = useAppSelector(
-    (state) => state.channel.selectedChannel
+    (state) => state.channel.selectedChannel,
+  );
+  const [campaignTierStatus, setCampaignTierStatus] = useState<boolean | null>(
+    null,
   );
 
   const [dateRange, setDateRange] = useState<{
@@ -57,7 +62,9 @@ export default function DashLayout() {
     newTierIndex2: 0,
   });
   const [loading, setLoading] = useState(false);
-  const [pointsAwardedStats, setPointsAwardedStats] = useState<PointsAwardedStat[]>([]);
+  const [pointsAwardedStats, setPointsAwardedStats] = useState<
+    PointsAwardedStat[]
+  >([]);
   const [totalPointsAwarded, setTotalPointsAwarded] = useState(0);
   const [pointsLoading, setPointsLoading] = useState(false);
 
@@ -65,7 +72,9 @@ export default function DashLayout() {
   today.setHours(23, 59, 59, 999); // Set to end of today
 
   const isDateUnavailable = (date: DateValue) => {
-    const dateObj = date.toDate ? date.toDate("UTC") : new Date(date.toString());
+    const dateObj = date.toDate
+      ? date.toDate("UTC")
+      : new Date(date.toString());
     return dateObj > today;
   };
 
@@ -103,7 +112,7 @@ export default function DashLayout() {
           storeId,
           selectedChannel.channel_id,
           page,
-          100 // Fetch 100 per page
+          100, // Fetch 100 per page
         );
 
         if (response.data && response.data.length > 0) {
@@ -120,16 +129,20 @@ export default function DashLayout() {
       // Filter new customers based on date range
       let filteredNewCustomers: Customer[] = [];
       if (dateRange.start && dateRange.end) {
-        const startDate = dateRange.start.toDate ? dateRange.start.toDate("UTC") : new Date(dateRange.start.toString());
-        const endDate = dateRange.end.toDate ? dateRange.end.toDate("UTC") : new Date(dateRange.end.toString());
+        const startDate = dateRange.start.toDate
+          ? dateRange.start.toDate("UTC")
+          : new Date(dateRange.start.toString());
+        const endDate = dateRange.end.toDate
+          ? dateRange.end.toDate("UTC")
+          : new Date(dateRange.end.toString());
         endDate.setHours(23, 59, 59, 999); // Set to end of day
 
         filteredNewCustomers = allCustomers.filter((customer) => {
           const customerDate = customer.createdAt
             ? new Date(customer.createdAt)
             : customer.joiningDate
-            ? new Date(customer.joiningDate)
-            : null;
+              ? new Date(customer.joiningDate)
+              : null;
 
           if (!customerDate) return false;
 
@@ -197,15 +210,19 @@ export default function DashLayout() {
         return;
       }
 
-      const startDate = dateRange.start.toDate ? dateRange.start.toDate("UTC") : new Date(dateRange.start.toString());
-      const endDate = dateRange.end.toDate ? dateRange.end.toDate("UTC") : new Date(dateRange.end.toString());
+      const startDate = dateRange.start.toDate
+        ? dateRange.start.toDate("UTC")
+        : new Date(dateRange.start.toString());
+      const endDate = dateRange.end.toDate
+        ? dateRange.end.toDate("UTC")
+        : new Date(dateRange.end.toString());
       endDate.setHours(23, 59, 59, 999);
 
       const response = await getPointsAwardedStats(
         storeId,
         selectedChannel.channel_id,
         startDate.toISOString(),
-        endDate.toISOString()
+        endDate.toISOString(),
       );
 
       if (response.success && response.data) {
@@ -235,8 +252,14 @@ export default function DashLayout() {
   const newMembers = newCustomers.length;
 
   // Helper function to get stats for a transaction type
-  const getStatForTransaction = (transactionName: string): PointsAwardedStat | null => {
-    return pointsAwardedStats.find((stat) => stat.transactionName === transactionName) || null;
+  const getStatForTransaction = (
+    transactionName: string,
+  ): PointsAwardedStat | null => {
+    return (
+      pointsAwardedStats.find(
+        (stat) => stat.transactionName === transactionName,
+      ) || null
+    );
   };
 
   // Calculate currency value (assuming 1000 points = 1 currency unit)
@@ -250,14 +273,18 @@ export default function DashLayout() {
       return (
         <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
           <span>{Math.abs(growth).toFixed(0)}%</span>
-          <span><ArrowUp strokeWidth={3} className="w-3 h-3 text-white" /></span>
+          <span>
+            <ArrowUp strokeWidth={3} className="w-3 h-3 text-white" />
+          </span>
         </div>
       );
     } else if (growth < 0) {
       return (
         <div className="flex items-center gap-1 bg-[#F95353] text-white px-2 py-0.5 rounded-full text-xs">
           <span>{Math.abs(growth).toFixed(0)}%</span>
-          <span><ArrowDown strokeWidth={3} className="w-3 h-3 text-white" /></span>
+          <span>
+            <ArrowDown strokeWidth={3} className="w-3 h-3 text-white" />
+          </span>
         </div>
       );
     } else {
@@ -283,10 +310,7 @@ export default function DashLayout() {
               base: "p-4",
             }}
           >
-            <Tab
-              key="reward-program-summary"
-              title="Reward Program Summary"
-            >
+            <Tab key="reward-program-summary" title="Reward Program Summary">
               <div className="absolute right-4 top-[14px]">
                 <DateRangePicker
                   className="selectorButton"
@@ -311,7 +335,8 @@ export default function DashLayout() {
                     }
                   }}
                   classNames={{
-                    inputWrapper: "border border-[#EBEBEB] bg-white focus:ring-0 focus:border-[#EBEBEB] cursor-pointer",
+                    inputWrapper:
+                      "border border-[#EBEBEB] bg-white focus:ring-0 focus:border-[#EBEBEB] cursor-pointer",
                     input: "cursor-pointer",
                     selectorButton: "cursor-pointer",
                   }}
@@ -351,7 +376,9 @@ export default function DashLayout() {
                       {/* Bronze Tier (tierIndex 0) */}
                       <div className="card">
                         <div className="flex flex-col gap-2">
-                          <span className="text-sm font-bold text-[#303030]">Bronze</span>
+                          <span className="text-sm font-bold text-[#303030]">
+                            Bronze
+                          </span>
                           <div className="flex items-center gap-2">
                             <span className="text-xl font-bold text-[#303030]">
                               {loading ? "..." : tierCounts.tierIndex0}
@@ -359,7 +386,12 @@ export default function DashLayout() {
                             {tierCounts.newTierIndex0 > 0 ? (
                               <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
                                 <span>{tierCounts.newTierIndex0}</span>
-                                <span><ArrowUp strokeWidth={3} className="w-3 h-3 text-white" /></span>
+                                <span>
+                                  <ArrowUp
+                                    strokeWidth={3}
+                                    className="w-3 h-3 text-white"
+                                  />
+                                </span>
                               </div>
                             ) : (
                               <MoveHorizontal className="w-4 h-4 text-[#303030]" />
@@ -371,7 +403,9 @@ export default function DashLayout() {
                       {/* Silver Tier (tierIndex 1) */}
                       <div className="card">
                         <div className="flex flex-col gap-2">
-                          <span className="text-sm font-bold text-[#303030]">Silver</span>
+                          <span className="text-sm font-bold text-[#303030]">
+                            Silver
+                          </span>
                           <div className="flex items-center gap-2">
                             <span className="text-xl font-bold text-[#303030]">
                               {loading ? "..." : tierCounts.tierIndex1}
@@ -379,7 +413,12 @@ export default function DashLayout() {
                             {tierCounts.newTierIndex1 > 0 ? (
                               <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
                                 <span>{tierCounts.newTierIndex1}</span>
-                                <span><ArrowUp strokeWidth={3} className="w-3 h-3 text-white" /></span>
+                                <span>
+                                  <ArrowUp
+                                    strokeWidth={3}
+                                    className="w-3 h-3 text-white"
+                                  />
+                                </span>
                               </div>
                             ) : (
                               <MoveHorizontal className="w-4 h-4 text-[#303030]" />
@@ -391,7 +430,9 @@ export default function DashLayout() {
                       {/* Gold Tier (tierIndex 2) */}
                       <div className="card">
                         <div className="flex flex-col gap-2">
-                          <span className="text-sm font-bold text-[#303030]">Gold</span>
+                          <span className="text-sm font-bold text-[#303030]">
+                            Gold
+                          </span>
                           <div className="flex items-center gap-2">
                             <span className="text-xl font-bold text-[#303030]">
                               {loading ? "..." : tierCounts.tierIndex2}
@@ -399,7 +440,12 @@ export default function DashLayout() {
                             {tierCounts.newTierIndex2 > 0 ? (
                               <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
                                 <span>{tierCounts.newTierIndex2}</span>
-                                <span><ArrowUp strokeWidth={3} className="w-3 h-3 text-white" /></span>
+                                <span>
+                                  <ArrowUp
+                                    strokeWidth={3}
+                                    className="w-3 h-3 text-white"
+                                  />
+                                </span>
                               </div>
                             ) : (
                               <MoveHorizontal className="w-4 h-4 text-[#303030]" />
@@ -418,12 +464,16 @@ export default function DashLayout() {
                           Points Awarded:
                         </span>
                         <span className="text-base font-bold text-[#219653]">
-                          {pointsLoading ? "..." : totalPointsAwarded.toLocaleString()}
+                          {pointsLoading
+                            ? "..."
+                            : totalPointsAwarded.toLocaleString()}
                         </span>
                       </div>
                       <div className="text-sm text-[#303030]">
                         <span className="font-bold">
-                          {pointsLoading ? "..." : `${totalPointsAwarded.toLocaleString()} = Rs. ${pointsToCurrency(totalPointsAwarded).toFixed(2)}`}
+                          {pointsLoading
+                            ? "..."
+                            : `${totalPointsAwarded.toLocaleString()} = Rs. ${pointsToCurrency(totalPointsAwarded).toFixed(2)}`}
                         </span>
                       </div>
                     </div>
@@ -439,18 +489,28 @@ export default function DashLayout() {
                               width={18}
                               height={18}
                             />
-                            <span className="text-sm font-bold">Sign Up Bonus</span>
+                            <span className="text-sm font-bold">
+                              Sign Up Bonus
+                            </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xl font-bold text-[#303030]">
-                              {pointsLoading ? "..." : (getStatForTransaction("Sign Up Bonus")?.totalPointsCurrent || 0).toLocaleString()}
+                              {pointsLoading
+                                ? "..."
+                                : (
+                                    getStatForTransaction("Sign Up Bonus")
+                                      ?.totalPointsCurrent || 0
+                                  ).toLocaleString()}
                             </span>
-                            {!pointsLoading && getStatForTransaction("Sign Up Bonus") && 
-                              renderGrowthIndicator(getStatForTransaction("Sign Up Bonus")!.growth)
-                            }
-                            {!pointsLoading && !getStatForTransaction("Sign Up Bonus") && 
-                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
-                            }
+                            {!pointsLoading &&
+                              getStatForTransaction("Sign Up Bonus") &&
+                              renderGrowthIndicator(
+                                getStatForTransaction("Sign Up Bonus")!.growth,
+                              )}
+                            {!pointsLoading &&
+                              !getStatForTransaction("Sign Up Bonus") && (
+                                <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                              )}
                           </div>
                         </div>
                       </div>
@@ -469,14 +529,22 @@ export default function DashLayout() {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xl font-bold text-[#303030]">
-                              {pointsLoading ? "..." : (getStatForTransaction("Referral")?.totalPointsCurrent || 0).toLocaleString()}
+                              {pointsLoading
+                                ? "..."
+                                : (
+                                    getStatForTransaction("Referral")
+                                      ?.totalPointsCurrent || 0
+                                  ).toLocaleString()}
                             </span>
-                            {!pointsLoading && getStatForTransaction("Referral") && 
-                              renderGrowthIndicator(getStatForTransaction("Referral")!.growth)
-                            }
-                            {!pointsLoading && !getStatForTransaction("Referral") && 
-                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
-                            }
+                            {!pointsLoading &&
+                              getStatForTransaction("Referral") &&
+                              renderGrowthIndicator(
+                                getStatForTransaction("Referral")!.growth,
+                              )}
+                            {!pointsLoading &&
+                              !getStatForTransaction("Referral") && (
+                                <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                              )}
                           </div>
                         </div>
                       </div>
@@ -491,18 +559,29 @@ export default function DashLayout() {
                               width={18}
                               height={18}
                             />
-                            <span className="text-sm font-bold">Purchase Product</span>
+                            <span className="text-sm font-bold">
+                              Purchase Product
+                            </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xl font-bold text-[#303030]">
-                              {pointsLoading ? "..." : (getStatForTransaction("Purchase Product")?.totalPointsCurrent || 0).toLocaleString()}
+                              {pointsLoading
+                                ? "..."
+                                : (
+                                    getStatForTransaction("Purchase Product")
+                                      ?.totalPointsCurrent || 0
+                                  ).toLocaleString()}
                             </span>
-                            {!pointsLoading && getStatForTransaction("Purchase Product") && 
-                              renderGrowthIndicator(getStatForTransaction("Purchase Product")!.growth)
-                            }
-                            {!pointsLoading && !getStatForTransaction("Purchase Product") && 
-                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
-                            }
+                            {!pointsLoading &&
+                              getStatForTransaction("Purchase Product") &&
+                              renderGrowthIndicator(
+                                getStatForTransaction("Purchase Product")!
+                                  .growth,
+                              )}
+                            {!pointsLoading &&
+                              !getStatForTransaction("Purchase Product") && (
+                                <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                              )}
                           </div>
                         </div>
                       </div>
@@ -517,18 +596,32 @@ export default function DashLayout() {
                               width={18}
                               height={18}
                             />
-                            <span className="text-sm font-bold">Birthday Celebration</span>
+                            <span className="text-sm font-bold">
+                              Birthday Celebration
+                            </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xl font-bold text-[#303030]">
-                              {pointsLoading ? "..." : (getStatForTransaction("Birthday Celebration")?.totalPointsCurrent || 0).toLocaleString()}
+                              {pointsLoading
+                                ? "..."
+                                : (
+                                    getStatForTransaction(
+                                      "Birthday Celebration",
+                                    )?.totalPointsCurrent || 0
+                                  ).toLocaleString()}
                             </span>
-                            {!pointsLoading && getStatForTransaction("Birthday Celebration") && 
-                              renderGrowthIndicator(getStatForTransaction("Birthday Celebration")!.growth)
-                            }
-                            {!pointsLoading && !getStatForTransaction("Birthday Celebration") && 
-                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
-                            }
+                            {!pointsLoading &&
+                              getStatForTransaction("Birthday Celebration") &&
+                              renderGrowthIndicator(
+                                getStatForTransaction("Birthday Celebration")!
+                                  .growth,
+                              )}
+                            {!pointsLoading &&
+                              !getStatForTransaction(
+                                "Birthday Celebration",
+                              ) && (
+                                <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                              )}
                           </div>
                         </div>
                       </div>
@@ -543,18 +636,29 @@ export default function DashLayout() {
                               width={18}
                               height={18}
                             />
-                            <span className="text-sm font-bold">Newsletter Bonus</span>
+                            <span className="text-sm font-bold">
+                              Newsletter Bonus
+                            </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xl font-bold text-[#303030]">
-                              {pointsLoading ? "..." : (getStatForTransaction("Newsletter Bonus")?.totalPointsCurrent || 0).toLocaleString()}
+                              {pointsLoading
+                                ? "..."
+                                : (
+                                    getStatForTransaction("Newsletter Bonus")
+                                      ?.totalPointsCurrent || 0
+                                  ).toLocaleString()}
                             </span>
-                            {!pointsLoading && getStatForTransaction("Newsletter Bonus") && 
-                              renderGrowthIndicator(getStatForTransaction("Newsletter Bonus")!.growth)
-                            }
-                            {!pointsLoading && !getStatForTransaction("Newsletter Bonus") && 
-                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
-                            }
+                            {!pointsLoading &&
+                              getStatForTransaction("Newsletter Bonus") &&
+                              renderGrowthIndicator(
+                                getStatForTransaction("Newsletter Bonus")!
+                                  .growth,
+                              )}
+                            {!pointsLoading &&
+                              !getStatForTransaction("Newsletter Bonus") && (
+                                <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                              )}
                           </div>
                         </div>
                       </div>
@@ -569,18 +673,29 @@ export default function DashLayout() {
                               width={18}
                               height={18}
                             />
-                            <span className="text-sm font-bold">Profile Completion</span>
+                            <span className="text-sm font-bold">
+                              Profile Completion
+                            </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xl font-bold text-[#303030]">
-                              {pointsLoading ? "..." : (getStatForTransaction("Profile Completion")?.totalPointsCurrent || 0).toLocaleString()}
+                              {pointsLoading
+                                ? "..."
+                                : (
+                                    getStatForTransaction("Profile Completion")
+                                      ?.totalPointsCurrent || 0
+                                  ).toLocaleString()}
                             </span>
-                            {!pointsLoading && getStatForTransaction("Profile Completion") && 
-                              renderGrowthIndicator(getStatForTransaction("Profile Completion")!.growth)
-                            }
-                            {!pointsLoading && !getStatForTransaction("Profile Completion") && 
-                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
-                            }
+                            {!pointsLoading &&
+                              getStatForTransaction("Profile Completion") &&
+                              renderGrowthIndicator(
+                                getStatForTransaction("Profile Completion")!
+                                  .growth,
+                              )}
+                            {!pointsLoading &&
+                              !getStatForTransaction("Profile Completion") && (
+                                <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                              )}
                           </div>
                         </div>
                       </div>
@@ -595,18 +710,29 @@ export default function DashLayout() {
                               width={18}
                               height={18}
                             />
-                            <span className="text-sm font-bold">Event Celebration</span>
+                            <span className="text-sm font-bold">
+                              Event Celebration
+                            </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xl font-bold text-[#303030]">
-                              {pointsLoading ? "..." : (getStatForTransaction("Event Celebration")?.totalPointsCurrent || 0).toLocaleString()}
+                              {pointsLoading
+                                ? "..."
+                                : (
+                                    getStatForTransaction("Event Celebration")
+                                      ?.totalPointsCurrent || 0
+                                  ).toLocaleString()}
                             </span>
-                            {!pointsLoading && getStatForTransaction("Event Celebration") && 
-                              renderGrowthIndicator(getStatForTransaction("Event Celebration")!.growth)
-                            }
-                            {!pointsLoading && !getStatForTransaction("Event Celebration") && 
-                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
-                            }
+                            {!pointsLoading &&
+                              getStatForTransaction("Event Celebration") &&
+                              renderGrowthIndicator(
+                                getStatForTransaction("Event Celebration")!
+                                  .growth,
+                              )}
+                            {!pointsLoading &&
+                              !getStatForTransaction("Event Celebration") && (
+                                <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                              )}
                           </div>
                         </div>
                       </div>
@@ -621,18 +747,28 @@ export default function DashLayout() {
                               width={18}
                               height={18}
                             />
-                            <span className="text-sm font-bold">Rejoin Bonus</span>
+                            <span className="text-sm font-bold">
+                              Rejoin Bonus
+                            </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xl font-bold text-[#303030]">
-                              {pointsLoading ? "..." : (getStatForTransaction("Rejoin Bonus")?.totalPointsCurrent || 0).toLocaleString()}
+                              {pointsLoading
+                                ? "..."
+                                : (
+                                    getStatForTransaction("Rejoin Bonus")
+                                      ?.totalPointsCurrent || 0
+                                  ).toLocaleString()}
                             </span>
-                            {!pointsLoading && getStatForTransaction("Rejoin Bonus") && 
-                              renderGrowthIndicator(getStatForTransaction("Rejoin Bonus")!.growth)
-                            }
-                            {!pointsLoading && !getStatForTransaction("Rejoin Bonus") && 
-                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
-                            }
+                            {!pointsLoading &&
+                              getStatForTransaction("Rejoin Bonus") &&
+                              renderGrowthIndicator(
+                                getStatForTransaction("Rejoin Bonus")!.growth,
+                              )}
+                            {!pointsLoading &&
+                              !getStatForTransaction("Rejoin Bonus") && (
+                                <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                              )}
                           </div>
                         </div>
                       </div>
@@ -666,10 +802,14 @@ export default function DashLayout() {
                               width={18}
                               height={18}
                             />
-                            <span className="text-sm font-bold">Percentage Discount</span>
+                            <span className="text-sm font-bold">
+                              Percentage Discount
+                            </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">0</span>
+                            <span className="text-xl font-bold text-[#303030]">
+                              0
+                            </span>
                             <MoveHorizontal className="w-4 h-4 text-[#303030]" />
                           </div>
                         </div>
@@ -685,10 +825,14 @@ export default function DashLayout() {
                               width={18}
                               height={18}
                             />
-                            <span className="text-sm font-bold">Fixed Discount</span>
+                            <span className="text-sm font-bold">
+                              Fixed Discount
+                            </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">0</span>
+                            <span className="text-xl font-bold text-[#303030]">
+                              0
+                            </span>
                             <MoveHorizontal className="w-4 h-4 text-[#303030]" />
                           </div>
                         </div>
@@ -704,10 +848,14 @@ export default function DashLayout() {
                               width={18}
                               height={18}
                             />
-                            <span className="text-sm font-bold">Free Shipping</span>
+                            <span className="text-sm font-bold">
+                              Free Shipping
+                            </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">0</span>
+                            <span className="text-xl font-bold text-[#303030]">
+                              0
+                            </span>
                             <MoveHorizontal className="w-4 h-4 text-[#303030]" />
                           </div>
                         </div>
@@ -723,10 +871,14 @@ export default function DashLayout() {
                               width={18}
                               height={18}
                             />
-                            <span className="text-sm font-bold">Free Product</span>
+                            <span className="text-sm font-bold">
+                              Free Product
+                            </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">0</span>
+                            <span className="text-xl font-bold text-[#303030]">
+                              0
+                            </span>
                             <MoveHorizontal className="w-4 h-4 text-[#303030]" />
                           </div>
                         </div>
@@ -742,11 +894,18 @@ export default function DashLayout() {
               title="Campaign Features Summary"
               className="text-[13px]"
             >
-              <div className="absolute right-4 top-[14px]">
-                <Button className="custom-btn">Eanble Tier</Button>
-              </div>
+              {campaignTierStatus === false && (
+                <div className="absolute right-4 top-[14px]">
+                  <Button
+                    className="custom-btn"
+                    onPress={() => router.push("/setup/points-tier-system")}
+                  >
+                    Enable Tier
+                  </Button>
+                </div>
+              )}
               <div className="border-t border-[#e5e7eb] p-4">
-                <CampaignTableArea />
+                <CampaignTableArea onTierStatusChange={setCampaignTierStatus} />
               </div>
             </Tab>
           </Tabs>

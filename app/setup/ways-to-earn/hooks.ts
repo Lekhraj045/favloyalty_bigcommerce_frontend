@@ -9,7 +9,7 @@ import type { Event, EventFormData } from "./types";
  */
 export function useWaysToEarnSettings() {
   const selectedChannel = useAppSelector(
-    (state) => state.channel.selectedChannel
+    (state) => state.channel.selectedChannel,
   );
   const storeId = getStoreId();
   const channelId = selectedChannel?.id || null;
@@ -38,6 +38,7 @@ export function useWaysToEarnSettings() {
   // State for Add Event form
   const [eventFormData, setEventFormData] = useState<EventFormData>({
     name: "",
+    customEventName: "",
     date: null,
     points: "",
   });
@@ -72,7 +73,7 @@ export function useWaysToEarnSettings() {
     setRejoinEnabled(false);
     setRecallDays("0");
     setRejoinPoints("0");
-    setEventFormData({ name: "", date: null, points: "" });
+    setEventFormData({ name: "", customEventName: "", date: null, points: "" });
   };
 
   // Load collect settings when page loads or channel changes
@@ -108,10 +109,10 @@ export function useWaysToEarnSettings() {
             }
             if (data.basic.profileComplition) {
               setProfileCompletionEnabled(
-                data.basic.profileComplition.active || false
+                data.basic.profileComplition.active || false,
               );
               setProfileCompletionPoints(
-                String(data.basic.profileComplition.point || 0)
+                String(data.basic.profileComplition.point || 0),
               );
             }
           }
@@ -142,7 +143,7 @@ export function useWaysToEarnSettings() {
                     totalCustomers: 0,
                     error: null,
                   },
-                })
+                }),
               );
               setEvents(eventsWithDefaults);
             } else {
@@ -153,7 +154,12 @@ export function useWaysToEarnSettings() {
           }
 
           // Reset event form after loading
-          setEventFormData({ name: "", date: null, points: "" });
+          setEventFormData({
+            name: "",
+            customEventName: "",
+            date: null,
+            points: "",
+          });
 
           // Load rejoin settings
           if (data.rejoin) {
@@ -236,14 +242,14 @@ export function useUnsavedChanges(
   events: Event[],
   savedEvents: Event[],
   onSave: () => Promise<void>,
-  onDiscard?: () => void
+  onDiscard?: () => void,
 ) {
   const router = useRouter();
   const pathname = usePathname();
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
-    null
+    null,
   );
   const isNavigatingRef = useRef(false);
 

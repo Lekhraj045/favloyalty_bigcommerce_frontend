@@ -36,13 +36,13 @@ export default function EventsTable({
 }: EventsTableProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editFormData, setEditFormData] = useState<EventFormData | null>(null);
-  
+
   // Sort events to show "Scheduled" events first
   const sortedEvents = useMemo(() => {
     return [...events].sort((a, b) => {
       const statusA = (a.status || "").toLowerCase();
       const statusB = (b.status || "").toLowerCase();
-      
+
       // If one is "scheduled" and the other is not, scheduled comes first
       if (statusA === "scheduled" && statusB !== "scheduled") {
         return -1;
@@ -50,12 +50,12 @@ export default function EventsTable({
       if (statusA !== "scheduled" && statusB === "scheduled") {
         return 1;
       }
-      
+
       // If both have the same status or neither is scheduled, maintain original order
       return 0;
     });
   }, [events]);
-  
+
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -84,7 +84,7 @@ export default function EventsTable({
   const handleStartEdit = (
     event: Event,
     index: number,
-    e?: React.MouseEvent
+    e?: React.MouseEvent,
   ) => {
     // Prevent event propagation and default behavior
     if (e) {
@@ -102,7 +102,7 @@ export default function EventsTable({
     const calendarDate = new CalendarDate(
       date.getFullYear(),
       date.getMonth() + 1,
-      date.getDate()
+      date.getDate(),
     );
     setEditFormData({
       name: event.name,
@@ -189,7 +189,7 @@ export default function EventsTable({
     const eventDateObj = new Date(
       editFormData.date.year,
       editFormData.date.month - 1,
-      editFormData.date.day
+      editFormData.date.day,
     );
 
     // Check if event date is today (for isImmediate)
@@ -203,7 +203,7 @@ export default function EventsTable({
     // eventsArray is already declared above, so we reuse it
     const eventDate = new Date(eventDateObj);
     eventDate.setHours(0, 0, 0, 0);
-    
+
     const isDuplicate = eventsArray.some((existingEvent, existingIndex) => {
       // Find the index in the allEvents array if we're using filtered events
       let actualExistingIndex = existingIndex;
@@ -222,15 +222,15 @@ export default function EventsTable({
         });
         actualExistingIndex = foundIndex !== -1 ? foundIndex : existingIndex;
       }
-      
+
       // Skip the current event being edited
       if (actualExistingIndex === actualIndex) {
         return false;
       }
-      
+
       const existingDate = new Date(existingEvent.eventDate);
       existingDate.setHours(0, 0, 0, 0);
-      
+
       return (
         existingEvent.name.toLowerCase() === trimmedEventName.toLowerCase() &&
         existingDate.getTime() === eventDate.getTime()
@@ -362,6 +362,13 @@ export default function EventsTable({
                       }}
                     >
                       <option value="">Select Event</option>
+                      {/* Preserve custom/unlisted event names while editing */}
+                      {currentEditData?.name &&
+                        !eventOptions.includes(currentEditData.name) && (
+                          <option value={currentEditData.name}>
+                            {currentEditData.name}
+                          </option>
+                        )}
                       {eventOptions.map((option) => (
                         <option key={option} value={option}>
                           {option}
@@ -427,7 +434,7 @@ export default function EventsTable({
                             setEditFormData({
                               ...currentEditData!,
                               points: value,
-                            })
+                            }),
                         );
                       }}
                       onBlur={() =>
@@ -437,7 +444,7 @@ export default function EventsTable({
                             setEditFormData({
                               ...currentEditData!,
                               points: value,
-                            })
+                            }),
                         )
                       }
                       onKeyDown={(e) => {
@@ -541,8 +548,9 @@ export default function EventsTable({
                               originalIndex !== -1 ? originalIndex : index;
 
                             // Check if event is completed - disable delete for completed events
-                            const isCompleted = event.status?.toLowerCase() === "completed";
-                            
+                            const isCompleted =
+                              event.status?.toLowerCase() === "completed";
+
                             return (
                               <span
                                 onClick={(e) => {
@@ -555,7 +563,7 @@ export default function EventsTable({
                                   e.stopPropagation();
                                   onDelete(
                                     event._id || actualIndex,
-                                    actualIndex
+                                    actualIndex,
                                   );
                                   return false;
                                 }}

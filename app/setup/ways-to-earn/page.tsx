@@ -3,14 +3,14 @@
 import SetupHeader from "@/components/SetupHeader";
 import SetupNavigation from "@/components/SetupNavigation";
 import UpgradeModal from "@/components/UpgradeModal";
-import { useAppDispatch } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { updateChannelCompletionStatus } from "@/store/slices/channelSlice";
 import {
-    getStorePlan,
-    saveCollectSettings,
-    StorePlan,
-    updatePageCompletionStatus,
-    updateSetupProgress,
+  getStorePlan,
+  saveCollectSettings,
+  StorePlan,
+  updatePageCompletionStatus,
+  updateSetupProgress,
 } from "@/utils/api";
 import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
@@ -29,14 +29,19 @@ export default function WaysToEarn() {
   const router = useRouter();
   const settings = useWaysToEarnSettings();
   const dispatch = useAppDispatch();
+  const selectedChannel = useAppSelector(
+    (state) => state.channel.selectedChannel,
+  );
+  const everyPurchaseLabel = selectedChannel?.default_currency ?? "INR";
   const [savedEvents, setSavedEvents] = useState<Event[]>([]);
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveAndNextLoading, setSaveAndNextLoading] = useState(false);
-  
+
   // Plan and upgrade modal state
   const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
-  const [restrictedFeatureName, setRestrictedFeatureName] = useState<string>("");
+  const [restrictedFeatureName, setRestrictedFeatureName] =
+    useState<string>("");
   const hasDisabledFeaturesRef = useRef<boolean>(false);
 
   // Helper function to check if user is on free plan
@@ -59,7 +64,11 @@ export default function WaysToEarn() {
       } catch (error) {
         console.error("Error loading store plan:", error);
         // Default to free plan if error
-        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null });
+        setStorePlan({
+          plan: "free",
+          trialDaysRemaining: null,
+          paypalSubscriptionId: null,
+        });
       }
     };
     loadStorePlan();
@@ -122,7 +131,7 @@ export default function WaysToEarn() {
       (event) =>
         event.name?.toLowerCase().includes(query) ||
         event.eventDate?.toLowerCase().includes(query) ||
-        String(event.point)?.includes(query)
+        String(event.point)?.includes(query),
     );
   }, [settings.events, settings.eventSearchQuery]);
 
@@ -150,7 +159,7 @@ export default function WaysToEarn() {
       settings.everyPurchase.enabled &&
       (parseFloat(settings.everyPurchase.points) || 0) === 0
     ) {
-      validationErrors.push("Every purchase (Per INR spent)");
+      validationErrors.push(`Every purchase (Per ${everyPurchaseLabel} spent)`);
     }
     if (
       settings.birthday.enabled &&
@@ -249,40 +258,53 @@ export default function WaysToEarn() {
       const response = await saveCollectSettings(
         settings.storeId,
         settings.channelId,
-        settingsData
+        settingsData,
       );
 
       if (response && response.success) {
         // Check if events were processed for today
-        const eventsWereProcessed = response.eventProcessing && response.eventProcessing.processed;
-        
+        const eventsWereProcessed =
+          response.eventProcessing && response.eventProcessing.processed;
+
         if (eventsWereProcessed) {
-          console.log("✅ Events were processed for today:", response.eventProcessing);
+          console.log(
+            "✅ Events were processed for today:",
+            response.eventProcessing,
+          );
         }
-        
+
         // Always use events from backend response if available (they have latest statuses)
         // This ensures that if events were processed, their status is updated to "completed"
-        if (response.data && response.data.event && response.data.event.events) {
-          const updatedEvents = response.data.event.events.map((event: any) => ({
-            ...event,
-            status: event.status || "scheduled",
-            isImmediate: event.isImmediate || false,
-            type: event.type || "default",
-            processingInfo: event.processingInfo || {
-              startedAt: null,
-              completedAt: null,
-              jobID: null,
-              processedCount: 0,
-              failedCount: 0,
-              totalCustomers: 0,
-              error: null,
-            },
-          }));
-          
+        if (
+          response.data &&
+          response.data.event &&
+          response.data.event.events
+        ) {
+          const updatedEvents = response.data.event.events.map(
+            (event: any) => ({
+              ...event,
+              status: event.status || "scheduled",
+              isImmediate: event.isImmediate || false,
+              type: event.type || "default",
+              processingInfo: event.processingInfo || {
+                startedAt: null,
+                completedAt: null,
+                jobID: null,
+                processedCount: 0,
+                failedCount: 0,
+                totalCustomers: 0,
+                error: null,
+              },
+            }),
+          );
+
           // Update events state with backend data (includes updated statuses like "completed")
           settings.setEvents(updatedEvents);
-          console.log("✅ Updated events with statuses from backend:", updatedEvents);
-          
+          console.log(
+            "✅ Updated events with statuses from backend:",
+            updatedEvents,
+          );
+
           // Update saved events state with the updated events
           setSavedEvents(JSON.parse(JSON.stringify(updatedEvents)));
         } else {
@@ -312,7 +334,7 @@ export default function WaysToEarn() {
           await updatePageCompletionStatus(
             settings.channelId,
             "waysToEarn",
-            isPageCompleted
+            isPageCompleted,
           );
           // Update Redux store to reflect the new completion status
           dispatch(
@@ -320,7 +342,7 @@ export default function WaysToEarn() {
               channelId: settings.channelId,
               pageType: "waysToEarn",
               completed: isPageCompleted,
-            })
+            }),
           );
         } catch (error) {
           console.error("Error updating page completion status:", error);
@@ -360,7 +382,7 @@ export default function WaysToEarn() {
     () => {
       // Reset events to saved state
       settings.setEvents(JSON.parse(JSON.stringify(savedEvents)));
-    }
+    },
   );
 
   // Event handlers
@@ -370,11 +392,11 @@ export default function WaysToEarn() {
       // Check for duplicate event (same name and date)
       const eventDate = new Date(newEvent.eventDate);
       eventDate.setHours(0, 0, 0, 0);
-      
+
       const isDuplicate = settings.events.some((existingEvent) => {
         const existingDate = new Date(existingEvent.eventDate);
         existingDate.setHours(0, 0, 0, 0);
-        
+
         return (
           existingEvent.name.toLowerCase() === newEvent.name.toLowerCase() &&
           existingDate.getTime() === eventDate.getTime()
@@ -391,7 +413,12 @@ export default function WaysToEarn() {
       }
 
       settings.setEvents([...settings.events, newEvent]);
-      settings.setEventFormData({ name: "", date: null, points: "" });
+      settings.setEventFormData({
+        name: "",
+        customEventName: "",
+        date: null,
+        points: "",
+      });
       addToast({
         title: "Success",
         description: "Event added successfully",
@@ -451,6 +478,7 @@ export default function WaysToEarn() {
           referEarn={settings.referEarn}
           profileCompletion={settings.profileCompletion}
           newsletter={settings.newsletter}
+          everyPurchaseCurrency={everyPurchaseLabel}
           onSignUpChange={(enabled, points) => {
             // Always update enabled state first
             settings.setSignUpEnabled(enabled);
@@ -499,10 +527,12 @@ export default function WaysToEarn() {
             unsavedChanges.setHasUnsavedChanges(true);
           }}
           onFormChange={(field, value) => {
-            settings.setEventFormData({
-              ...settings.eventFormData,
+            // Functional update prevents stale-state overwrites when multiple
+            // field updates happen in the same user interaction.
+            settings.setEventFormData((prev) => ({
+              ...prev,
               [field]: value,
-            });
+            }));
           }}
           onAddEvent={handleAddEvent}
           onEditEvent={handleEditEvent}

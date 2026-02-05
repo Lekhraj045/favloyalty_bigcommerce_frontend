@@ -1,10 +1,30 @@
 "use client";
 
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import PointsSetting from "./setup/points-tier-system/PointsSetting";
 import SetupNavigation from "@/components/SetupNavigation";
 import SetupHeader from "@/components/SetupHeader";
+import { Alert } from "@heroui/alert";
 
-export default function Home() {
+function HomeContent() {
+  const searchParams = useSearchParams();
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const paymentStatus = searchParams.get('payment');
+  const userId = searchParams.get('userId');
+  const channelId = searchParams.get('channelId');
+  const storeId = searchParams.get('storeId');
+
+  useEffect(() => {
+    if (paymentStatus === 'success') {
+      setShowSuccessMessage(true);
+      // Hide message after 5 seconds
+      const timer = setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [paymentStatus]);
 
   return (
     <>
@@ -15,9 +35,26 @@ export default function Home() {
             <SetupNavigation />
           </div>
 
+          {showSuccessMessage && (
+            <Alert
+              color="success"
+              title="Payment Successful!"
+              description="Your payment has been processed successfully. You can now continue setting up your loyalty program."
+              onClose={() => setShowSuccessMessage(false)}
+            />
+          )}
+
           <PointsSetting />
         </div>
       </div>
     </>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <HomeContent />
+    </Suspense>
   );
 }

@@ -65,7 +65,7 @@ const refreshSessionToken = async (): Promise<string | null> => {
         const errorBody = await response.json().catch(() => ({}));
         console.error("❌ Error refreshing token:", errorBody);
         throw new Error(
-          errorBody.message || errorBody.error || "Failed to refresh token"
+          errorBody.message || errorBody.error || "Failed to refresh token",
         );
       }
 
@@ -76,7 +76,7 @@ const refreshSessionToken = async (): Promise<string | null> => {
       localStorage.setItem("bc_session_token", sessionToken);
       localStorage.setItem(
         "bc_session_expires_at",
-        sessionExpiresAt.toString()
+        sessionExpiresAt.toString(),
       );
 
       console.log("✅ Session token refreshed successfully");
@@ -126,7 +126,7 @@ const getAuthHeaders = (includeContentType = false): HeadersInit => {
 const fetchWithAuth = async (
   url: string,
   options: RequestInit = {},
-  retryCount = 0
+  retryCount = 0,
 ): Promise<Response> => {
   const maxRetries = 1;
 
@@ -136,7 +136,7 @@ const fetchWithAuth = async (
   // Build headers - preserve existing headers but add auth
   const headers = new Headers(options.headers);
   const authHeaders = getAuthHeaders(
-    options.body instanceof FormData ? false : true
+    options.body instanceof FormData ? false : true,
   );
   Object.entries(authHeaders).forEach(([key, value]) => {
     if (value) {
@@ -172,7 +172,7 @@ const fetchWithAuth = async (
     if (newToken) {
       // Update auth headers with new token
       const newAuthHeaders = getAuthHeaders(
-        options.body instanceof FormData ? false : true
+        options.body instanceof FormData ? false : true,
       );
       const retryHeaders = new Headers(options.headers);
       Object.entries(newAuthHeaders).forEach(([key, value]) => {
@@ -212,14 +212,14 @@ export async function getChannels(storeId: string): Promise<Channel[]> {
     `${API_URL}/api/channels?storeId=${storeId}`,
     {
       method: "GET",
-    }
+    },
   );
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error fetching channels:", errorBody);
     throw new Error(
-      errorBody.message || errorBody.error || "Failed to fetch channels"
+      errorBody.message || errorBody.error || "Failed to fetch channels",
     );
   }
 
@@ -250,6 +250,8 @@ export type Channel = {
   waysToEarnCompleted?: boolean;
   waysToRedeemCompleted?: boolean;
   customiseWidgetCompleted?: boolean;
+  widget_visibility?: boolean;
+  default_currency?: string | null; // Channel currency (e.g. INR, USD) for "per X spent" label
 };
 
 export type LoginResponse = {
@@ -284,7 +286,7 @@ export type LoginResponse = {
 };
 
 export async function loginWithSignedPayload(
-  signedPayload: string
+  signedPayload: string,
 ): Promise<LoginResponse> {
   const response = await fetch(`${API_URL}/api/login`, {
     method: "POST",
@@ -335,7 +337,7 @@ export async function savePoints(
   storeId: string,
   channelId: string,
   pointData: PointData,
-  logoFile?: File
+  logoFile?: File,
 ): Promise<{ success: boolean; message: string; data?: any }> {
   const formData = new FormData();
 
@@ -364,7 +366,7 @@ export async function savePoints(
   if (pointData.customPointName && pointData.customPointName.length > 0) {
     formData.append(
       "customPointName",
-      JSON.stringify(pointData.customPointName)
+      JSON.stringify(pointData.customPointName),
     );
   }
 
@@ -383,7 +385,7 @@ export async function savePoints(
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error saving points:", errorBody);
     throw new Error(
-      errorBody.message || errorBody.error || "Failed to save points"
+      errorBody.message || errorBody.error || "Failed to save points",
     );
   }
 
@@ -395,7 +397,7 @@ export async function savePoints(
 export async function updatePoints(
   pointId: string,
   pointData: PointData,
-  logoFile?: File
+  logoFile?: File,
 ): Promise<{ success: boolean; message: string; data?: any }> {
   const formData = new FormData();
 
@@ -422,7 +424,7 @@ export async function updatePoints(
   if (pointData.customPointName && pointData.customPointName.length > 0) {
     formData.append(
       "customPointName",
-      JSON.stringify(pointData.customPointName)
+      JSON.stringify(pointData.customPointName),
     );
   }
 
@@ -441,7 +443,7 @@ export async function updatePoints(
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error updating points:", errorBody);
     throw new Error(
-      errorBody.message || errorBody.error || "Failed to update points"
+      errorBody.message || errorBody.error || "Failed to update points",
     );
   }
 
@@ -452,7 +454,7 @@ export async function updatePoints(
 
 export async function getPoints(
   storeId: string,
-  channelId: string
+  channelId: string,
 ): Promise<PointData | null> {
   console.log("📥 Fetching points:", { storeId, channelId });
 
@@ -460,7 +462,7 @@ export async function getPoints(
     `${API_URL}/api/points?storeId=${storeId}&channelId=${channelId}`,
     {
       method: "GET",
-    }
+    },
   );
 
   if (!response.ok) {
@@ -471,7 +473,7 @@ export async function getPoints(
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error fetching points:", errorBody);
     throw new Error(
-      errorBody.message || errorBody.error || "Failed to fetch points"
+      errorBody.message || errorBody.error || "Failed to fetch points",
     );
   }
 
@@ -519,8 +521,13 @@ export interface CollectSettingsData {
 export async function saveCollectSettings(
   storeId: string,
   channelId: string,
-  settingsData: CollectSettingsData
-): Promise<{ success: boolean; message: string; data?: any }> {
+  settingsData: CollectSettingsData,
+): Promise<{
+  success: boolean;
+  message: string;
+  data?: any;
+  eventProcessing?: any;
+}> {
   console.log("📤 Saving collect settings:", {
     storeId,
     channelId,
@@ -541,7 +548,7 @@ export async function saveCollectSettings(
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error saving collect settings:", errorBody);
     throw new Error(
-      errorBody.message || errorBody.error || "Failed to save collect settings"
+      errorBody.message || errorBody.error || "Failed to save collect settings",
     );
   }
 
@@ -552,7 +559,7 @@ export async function saveCollectSettings(
 
 export async function getCollectSettings(
   storeId: string,
-  channelId: string
+  channelId: string,
 ): Promise<CollectSettingsData | null> {
   console.log("📥 Fetching collect settings:", { storeId, channelId });
 
@@ -560,7 +567,7 @@ export async function getCollectSettings(
     `${API_URL}/api/collect-settings?storeId=${storeId}&channelId=${channelId}`,
     {
       method: "GET",
-    }
+    },
   );
 
   if (!response.ok) {
@@ -571,7 +578,9 @@ export async function getCollectSettings(
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error fetching collect settings:", errorBody);
     throw new Error(
-      errorBody.message || errorBody.error || "Failed to fetch collect settings"
+      errorBody.message ||
+        errorBody.error ||
+        "Failed to fetch collect settings",
     );
   }
 
@@ -669,7 +678,7 @@ export interface RedeemCoupon {
 
 export async function getRedeemSettings(
   storeId: string,
-  channelId: string
+  channelId: string,
 ): Promise<RedeemCoupon[]> {
   console.log("📥 Fetching redeem settings:", { storeId, channelId });
 
@@ -677,7 +686,7 @@ export async function getRedeemSettings(
     `${API_URL}/api/redeem-settings?storeId=${storeId}&channelId=${channelId}`,
     {
       method: "GET",
-    }
+    },
   );
 
   if (!response.ok) {
@@ -688,7 +697,7 @@ export async function getRedeemSettings(
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error fetching redeem settings:", errorBody);
     throw new Error(
-      errorBody.message || errorBody.error || "Failed to fetch redeem settings"
+      errorBody.message || errorBody.error || "Failed to fetch redeem settings",
     );
   }
 
@@ -754,7 +763,7 @@ export interface CreateRedeemCouponData {
 export async function createRedeemCoupon(
   storeId: string,
   channelId: string,
-  couponData: CreateRedeemCouponData
+  couponData: CreateRedeemCouponData,
 ): Promise<{ success: boolean; message: string; data?: any }> {
   console.log("📤 Creating redeem coupon:", { storeId, channelId, couponData });
 
@@ -772,7 +781,7 @@ export async function createRedeemCoupon(
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error creating redeem coupon:", errorBody);
     throw new Error(
-      errorBody.message || errorBody.error || "Failed to create redeem coupon"
+      errorBody.message || errorBody.error || "Failed to create redeem coupon",
     );
   }
 
@@ -785,7 +794,7 @@ export async function updateRedeemCoupon(
   couponId: string,
   storeId: string,
   channelId: string,
-  couponData: Partial<CreateRedeemCouponData>
+  couponData: Partial<CreateRedeemCouponData>,
 ): Promise<{ success: boolean; message: string }> {
   console.log("📤 Updating redeem coupon:", {
     couponId,
@@ -809,7 +818,7 @@ export async function updateRedeemCoupon(
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error updating redeem coupon:", errorBody);
     throw new Error(
-      errorBody.message || errorBody.error || "Failed to update redeem coupon"
+      errorBody.message || errorBody.error || "Failed to update redeem coupon",
     );
   }
 
@@ -820,7 +829,7 @@ export async function updateRedeemCoupon(
 
 export async function toggleCouponStatus(
   couponId: string,
-  active: boolean
+  active: boolean,
 ): Promise<{ success: boolean; message: string; data?: any }> {
   console.log("📤 Toggling coupon status:", { couponId, active });
 
@@ -834,14 +843,16 @@ export async function toggleCouponStatus(
           couponId,
           active,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
       console.error("❌ Error toggling coupon status:", errorBody);
       throw new Error(
-        errorBody.message || errorBody.error || "Failed to toggle coupon status"
+        errorBody.message ||
+          errorBody.error ||
+          "Failed to toggle coupon status",
       );
     }
 
@@ -852,10 +863,10 @@ export async function toggleCouponStatus(
     // Handle network errors
     if (error.name === "TypeError" && error.message === "Failed to fetch") {
       console.error(
-        "❌ Network error - Backend server may not be running or CORS issue"
+        "❌ Network error - Backend server may not be running or CORS issue",
       );
       throw new Error(
-        "Unable to connect to server. Please check if the backend server is running."
+        "Unable to connect to server. Please check if the backend server is running.",
       );
     }
     throw error;
@@ -863,7 +874,7 @@ export async function toggleCouponStatus(
 }
 
 export async function deleteRedeemCoupon(
-  couponId: string
+  couponId: string,
 ): Promise<{ success: boolean; message: string }> {
   console.log("📤 Deleting redeem coupon:", { couponId });
 
@@ -880,7 +891,9 @@ export async function deleteRedeemCoupon(
       const errorBody = await response.json().catch(() => ({}));
       console.error("❌ Error deleting redeem coupon:", errorBody);
       throw new Error(
-        errorBody.message || errorBody.error || "Failed to delete redeem coupon"
+        errorBody.message ||
+          errorBody.error ||
+          "Failed to delete redeem coupon",
       );
     }
 
@@ -891,10 +904,10 @@ export async function deleteRedeemCoupon(
     // Handle network errors
     if (error.name === "TypeError" && error.message === "Failed to fetch") {
       console.error(
-        "❌ Network error - Backend server may not be running or CORS issue"
+        "❌ Network error - Backend server may not be running or CORS issue",
       );
       throw new Error(
-        "Unable to connect to server. Please check if the backend server is running."
+        "Unable to connect to server. Please check if the backend server is running.",
       );
     }
     throw error;
@@ -933,7 +946,7 @@ export async function getProducts(
   channelId: string | null,
   keyword?: string,
   limit: number = 50,
-  page: number = 1
+  page: number = 1,
 ): Promise<ProductsResponse> {
   console.log("📥 Fetching products:", {
     storeId,
@@ -961,14 +974,14 @@ export async function getProducts(
     `${API_URL}/api/products?${queryParams.toString()}`,
     {
       method: "GET",
-    }
+    },
   );
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error fetching products:", errorBody);
     throw new Error(
-      errorBody.message || errorBody.error || "Failed to fetch products"
+      errorBody.message || errorBody.error || "Failed to fetch products",
     );
   }
 
@@ -1036,7 +1049,7 @@ export interface CreateWidgetCustomizationData {
 // Get widget customization
 export async function getWidgetCustomization(
   storeId: string,
-  channelId: string
+  channelId: string,
 ): Promise<WidgetCustomization | null> {
   console.log("📥 Fetching widget customization:", { storeId, channelId });
 
@@ -1044,7 +1057,7 @@ export async function getWidgetCustomization(
     `${API_URL}/api/widget-customization?storeId=${storeId}&channelId=${channelId}`,
     {
       method: "GET",
-    }
+    },
   );
 
   if (!response.ok) {
@@ -1057,7 +1070,7 @@ export async function getWidgetCustomization(
     throw new Error(
       errorBody.message ||
         errorBody.error ||
-        "Failed to fetch widget customization"
+        "Failed to fetch widget customization",
     );
   }
 
@@ -1070,7 +1083,7 @@ export async function getWidgetCustomization(
 export async function saveWidgetCustomization(
   storeId: string,
   channelId: string,
-  widgetData: Omit<CreateWidgetCustomizationData, "storeId" | "channelId">
+  widgetData: Omit<CreateWidgetCustomizationData, "storeId" | "channelId">,
 ): Promise<{ success: boolean; message: string; data?: WidgetCustomization }> {
   console.log("📤 Saving widget customization:", {
     storeId,
@@ -1094,7 +1107,7 @@ export async function saveWidgetCustomization(
     throw new Error(
       errorBody.message ||
         errorBody.error ||
-        "Failed to save widget customization"
+        "Failed to save widget customization",
     );
   }
 
@@ -1109,7 +1122,7 @@ export async function updateWidgetCustomization(
   channelId: string,
   widgetData: Partial<
     Omit<CreateWidgetCustomizationData, "storeId" | "channelId">
-  >
+  >,
 ): Promise<{ success: boolean; message: string; data?: WidgetCustomization }> {
   console.log("📤 Updating widget customization:", {
     storeId,
@@ -1133,7 +1146,7 @@ export async function updateWidgetCustomization(
     throw new Error(
       errorBody.message ||
         errorBody.error ||
-        "Failed to update widget customization"
+        "Failed to update widget customization",
     );
   }
 
@@ -1145,7 +1158,7 @@ export async function updateWidgetCustomization(
 // Delete widget customization
 export async function deleteWidgetCustomization(
   storeId: string,
-  channelId: string
+  channelId: string,
 ): Promise<{ success: boolean; message: string }> {
   console.log("📤 Deleting widget customization:", { storeId, channelId });
 
@@ -1153,7 +1166,7 @@ export async function deleteWidgetCustomization(
     `${API_URL}/api/widget-customization?storeId=${storeId}&channelId=${channelId}`,
     {
       method: "DELETE",
-    }
+    },
   );
 
   if (!response.ok) {
@@ -1162,7 +1175,7 @@ export async function deleteWidgetCustomization(
     throw new Error(
       errorBody.message ||
         errorBody.error ||
-        "Failed to delete widget customization"
+        "Failed to delete widget customization",
     );
   }
 
@@ -1176,7 +1189,7 @@ export async function deleteWidgetCustomization(
 // This function recalculates it based on current completion status
 export async function updateSetupProgress(
   channelId: string,
-  progress?: number // Optional, kept for backward compatibility but ignored
+  progress?: number, // Optional, kept for backward compatibility but ignored
 ): Promise<{ success: boolean; message: string; data?: any }> {
   console.log("📤 Updating setup progress (auto-calculated):", { channelId });
 
@@ -1188,14 +1201,14 @@ export async function updateSetupProgress(
       body: JSON.stringify({
         channelId,
       }),
-    }
+    },
   );
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error updating setup progress:", errorBody);
     throw new Error(
-      errorBody.message || errorBody.error || "Failed to update setup progress"
+      errorBody.message || errorBody.error || "Failed to update setup progress",
     );
   }
 
@@ -1214,14 +1227,14 @@ export async function getSetupProgress(channelId: string): Promise<{
     `${API_URL}/api/channels/setup-progress?channelId=${channelId}`,
     {
       method: "GET",
-    }
+    },
   );
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error fetching setup progress:", errorBody);
     throw new Error(
-      errorBody.message || errorBody.error || "Failed to fetch setup progress"
+      errorBody.message || errorBody.error || "Failed to fetch setup progress",
     );
   }
 
@@ -1238,7 +1251,7 @@ export async function updatePageCompletionStatus(
     | "waysToEarn"
     | "waysToRedeem"
     | "customiseWidget",
-  completed: boolean
+  completed: boolean,
 ): Promise<{ success: boolean; message: string; data?: any }> {
   console.log("📤 Updating page completion status:", {
     channelId,
@@ -1256,7 +1269,7 @@ export async function updatePageCompletionStatus(
         pageType,
         completed: completed ? 1 : 0,
       }),
-    }
+    },
   );
 
   if (!response.ok) {
@@ -1265,12 +1278,43 @@ export async function updatePageCompletionStatus(
     throw new Error(
       errorBody.message ||
         errorBody.error ||
-        "Failed to update page completion status"
+        "Failed to update page completion status",
     );
   }
 
   const result = await response.json();
   console.log("✅ Page completion status updated successfully:", result);
+  return result;
+}
+
+// Update widget visibility for a channel (enable/disable widget)
+export async function updateWidgetVisibilityApi(
+  channelId: string,
+  visible: boolean,
+): Promise<{ success: boolean; message: string; data?: any }> {
+  console.log("📤 Updating widget visibility:", { channelId, visible });
+
+  const response = await fetchWithAuth(`${API_URL}/api/widget/visibility`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      channelId,
+      visible,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error updating widget visibility:", errorBody);
+    throw new Error(
+      errorBody.message ||
+        errorBody.error ||
+        "Failed to update widget visibility",
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Widget visibility updated successfully:", result);
   return result;
 }
 
@@ -1294,7 +1338,7 @@ export interface EmailTemplate {
 // Get email template by type
 export async function getEmailTemplateByType(
   channelId: string,
-  templateType: string
+  templateType: string,
 ): Promise<EmailTemplate | null> {
   console.log("📥 Fetching email template:", { channelId, templateType });
 
@@ -1302,7 +1346,7 @@ export async function getEmailTemplateByType(
     `${API_URL}/api/email-templates/by-type?channelId=${channelId}&templateType=${templateType}`,
     {
       method: "GET",
-    }
+    },
   );
 
   if (!response.ok) {
@@ -1313,7 +1357,7 @@ export async function getEmailTemplateByType(
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error fetching email template:", errorBody);
     throw new Error(
-      errorBody.message || errorBody.error || "Failed to fetch email template"
+      errorBody.message || errorBody.error || "Failed to fetch email template",
     );
   }
 
@@ -1327,9 +1371,14 @@ export async function updateEmailTemplate(
   channelId: string,
   templateType: string,
   templateData: Partial<EmailTemplate>,
-  bannerImageFile?: File
+  bannerImageFile?: File,
 ): Promise<EmailTemplate> {
-  console.log("📤 Updating email template:", { channelId, templateType, templateData, hasBannerImage: !!bannerImageFile });
+  console.log("📤 Updating email template:", {
+    channelId,
+    templateType,
+    templateData,
+    hasBannerImage: !!bannerImageFile,
+  });
 
   // If there's a banner image file, use FormData
   if (bannerImageFile) {
@@ -1337,12 +1386,12 @@ export async function updateEmailTemplate(
     formData.append("channelId", channelId);
     formData.append("templateType", templateType);
     formData.append("bannerImage", bannerImageFile);
-    
+
     // Append other template data as JSON string
     Object.keys(templateData).forEach((key) => {
       const value = templateData[key as keyof EmailTemplate];
       if (value !== undefined && value !== null) {
-        if (typeof value === 'object') {
+        if (typeof value === "object") {
           formData.append(key, JSON.stringify(value));
         } else {
           formData.append(key, String(value));
@@ -1350,19 +1399,18 @@ export async function updateEmailTemplate(
       }
     });
 
-    const response = await fetchWithAuth(
-      `${API_URL}/api/email-templates`,
-      {
-        method: "PUT",
-        body: formData,
-      }
-    );
+    const response = await fetchWithAuth(`${API_URL}/api/email-templates`, {
+      method: "PUT",
+      body: formData,
+    });
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
       console.error("❌ Error updating email template:", errorBody);
       throw new Error(
-        errorBody.message || errorBody.error || "Failed to update email template"
+        errorBody.message ||
+          errorBody.error ||
+          "Failed to update email template",
       );
     }
 
@@ -1371,23 +1419,22 @@ export async function updateEmailTemplate(
     return result.data || result;
   } else {
     // No file upload, use JSON
-    const response = await fetchWithAuth(
-      `${API_URL}/api/email-templates`,
-      {
-        method: "PUT",
-        body: JSON.stringify({
-          channelId,
-          templateType,
-          ...templateData,
-        }),
-      }
-    );
+    const response = await fetchWithAuth(`${API_URL}/api/email-templates`, {
+      method: "PUT",
+      body: JSON.stringify({
+        channelId,
+        templateType,
+        ...templateData,
+      }),
+    });
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
       console.error("❌ Error updating email template:", errorBody);
       throw new Error(
-        errorBody.message || errorBody.error || "Failed to update email template"
+        errorBody.message ||
+          errorBody.error ||
+          "Failed to update email template",
       );
     }
 
@@ -1416,12 +1463,36 @@ export async function getStorePlan(): Promise<StorePlan> {
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error fetching store plan:", errorBody);
     throw new Error(
-      errorBody.message || errorBody.error || "Failed to fetch store plan"
+      errorBody.message || errorBody.error || "Failed to fetch store plan",
     );
   }
 
   const result = await response.json();
   console.log("✅ Store plan fetched successfully:", result);
+  return result.data || result;
+}
+
+// Downgrade store to free plan
+export async function downgradeToFree(): Promise<StorePlan> {
+  console.log("📥 Downgrading to free plan...");
+
+  const response = await fetchWithAuth(
+    `${API_URL}/api/store/downgrade-to-free`,
+    {
+      method: "POST",
+    },
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error downgrading plan:", errorBody);
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to downgrade plan",
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Plan downgraded successfully:", result);
   return result.data || result;
 }
 
@@ -1466,6 +1537,10 @@ export interface Customer {
   };
   tierDisplay?: string; // "None" if tier system is off, otherwise tier name
   tierStatus?: boolean; // Whether tier system is enabled for this channel
+  tierOptions?: {
+    maxTierIndex: number;
+    tiers: { tierIndex: number; tierName: string }[];
+  } | null;
   profile?: CustomerProfile;
   default_address?: CustomerAddress;
   tags: string[];
@@ -1478,9 +1553,28 @@ export interface Customer {
 }
 
 // Transaction Types
-export type TransactionType = "earn" | "redeem" | "adjustment" | "referral" | "signup" | "expiration" | "refund";
-export type TransactionCategory = "order" | "manual" | "referral" | "signup" | "expiration" | "refund" | "other";
-export type TransactionStatus = "pending" | "completed" | "expired" | "cancelled" | "failed";
+export type TransactionType =
+  | "earn"
+  | "redeem"
+  | "adjustment"
+  | "referral"
+  | "signup"
+  | "expiration"
+  | "refund";
+export type TransactionCategory =
+  | "order"
+  | "manual"
+  | "referral"
+  | "signup"
+  | "expiration"
+  | "refund"
+  | "other";
+export type TransactionStatus =
+  | "pending"
+  | "completed"
+  | "expired"
+  | "cancelled"
+  | "failed";
 
 export interface Transaction {
   id: string;
@@ -1552,20 +1646,27 @@ export interface CustomersResponse {
 export interface FetchCustomersResponse {
   success: boolean;
   message: string;
-  data: {
+  data: Customer[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  source?: "database" | "bigcommerce";
+  syncStats?: {
     totalFetched: number;
     stored: number;
     updated: number;
     errors: number;
-    storeId: string;
-    channelId: number;
+    skipped: number;
   };
 }
 
 // Fetch customers from BigCommerce and store in database
 export async function fetchAndStoreCustomers(
   storeId: string,
-  channelId: number
+  channelId: number,
 ): Promise<FetchCustomersResponse> {
   console.log("📥 Fetching and storing customers:", { storeId, channelId });
 
@@ -1573,7 +1674,7 @@ export async function fetchAndStoreCustomers(
     `${API_URL}/api/customers/fetch?storeId=${storeId}&channelId=${channelId}`,
     {
       method: "POST",
-    }
+    },
   );
 
   if (!response.ok) {
@@ -1582,7 +1683,7 @@ export async function fetchAndStoreCustomers(
     throw new Error(
       errorBody.message ||
         errorBody.error ||
-        "Failed to fetch and store customers"
+        "Failed to fetch and store customers",
     );
   }
 
@@ -1596,7 +1697,7 @@ export async function getCustomers(
   storeId: string,
   channelId: number,
   page: number = 1,
-  limit: number = 50
+  limit: number = 50,
 ): Promise<CustomersResponse> {
   console.log("📥 Fetching customers:", { storeId, channelId, page, limit });
 
@@ -1621,14 +1722,14 @@ export async function getCustomers(
       `${API_URL}/api/customers?${queryParams.toString()}`,
       {
         method: "GET",
-      }
+      },
     );
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
       console.error("❌ Error fetching customers:", errorBody);
       throw new Error(
-        errorBody.message || errorBody.error || "Failed to fetch customers"
+        errorBody.message || errorBody.error || "Failed to fetch customers",
       );
     }
 
@@ -1638,9 +1739,11 @@ export async function getCustomers(
   } catch (error: any) {
     // Handle network errors
     if (error.name === "TypeError" && error.message === "Failed to fetch") {
-      console.error("❌ Network error - Backend server may not be running or CORS issue");
+      console.error(
+        "❌ Network error - Backend server may not be running or CORS issue",
+      );
       throw new Error(
-        `Unable to connect to backend server at ${API_URL}. Please check if the backend server is running.`
+        `Unable to connect to backend server at ${API_URL}. Please check if the backend server is running.`,
       );
     }
     throw error;
@@ -1649,7 +1752,7 @@ export async function getCustomers(
 
 // Get single customer by ID
 export async function getCustomerById(
-  customerId: string
+  customerId: string,
 ): Promise<{ success: boolean; data: Customer }> {
   console.log("📥 Fetching customer:", { customerId });
 
@@ -1657,19 +1760,50 @@ export async function getCustomerById(
     `${API_URL}/api/customers/${customerId}`,
     {
       method: "GET",
-    }
+    },
   );
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     console.error("❌ Error fetching customer:", errorBody);
     throw new Error(
-      errorBody.message || errorBody.error || "Failed to fetch customer"
+      errorBody.message || errorBody.error || "Failed to fetch customer",
     );
   }
 
   const result = await response.json();
   console.log("✅ Customer fetched successfully:", result);
+  return result;
+}
+
+/**
+ * Update customer tier (upgrade only). Fails if tierIndex is not higher than current.
+ */
+export async function updateCustomerTier(
+  customerId: string,
+  tierIndex: number,
+): Promise<{
+  success: boolean;
+  data: { id: string; currentTier: object; tierDisplay: string };
+}> {
+  const response = await fetchWithAuth(
+    `${API_URL}/api/customers/${customerId}/tier`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tierIndex }),
+    },
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to update customer tier",
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ Customer tier updated successfully:", result);
   return result;
 }
 
@@ -1688,7 +1822,7 @@ export async function getTransactions(
     transactionCategory?: TransactionCategory;
     page?: number;
     limit?: number;
-  }
+  },
 ): Promise<TransactionsResponse> {
   if (!storeId) {
     throw new Error("storeId is required");
@@ -1716,9 +1850,12 @@ export async function getTransactions(
     params.append("transactionCategory", options.transactionCategory);
   }
 
-  const response = await fetchWithAuth(`${API_URL}/api/transactions?${params.toString()}`, {
-    method: "GET",
-  });
+  const response = await fetchWithAuth(
+    `${API_URL}/api/transactions?${params.toString()}`,
+    {
+      method: "GET",
+    },
+  );
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
@@ -1732,13 +1869,13 @@ export async function getTransactions(
  * Get a single transaction by ID
  */
 export async function getTransactionById(
-  transactionId: string
+  transactionId: string,
 ): Promise<TransactionResponse> {
   const response = await fetchWithAuth(
     `${API_URL}/api/transactions/${transactionId}`,
     {
       method: "GET",
-    }
+    },
   );
 
   if (!response.ok) {
@@ -1753,7 +1890,7 @@ export async function getTransactionById(
  * Create a new transaction (for manual adjustments)
  */
 export async function createTransaction(
-  transactionData: CreateTransactionRequest
+  transactionData: CreateTransactionRequest,
 ): Promise<TransactionResponse> {
   const response = await fetchWithAuth(`${API_URL}/api/transactions`, {
     method: "POST",
@@ -1782,7 +1919,7 @@ export async function getCustomerTransactions(
     transactionCategory?: TransactionCategory;
     page?: number;
     limit?: number;
-  }
+  },
 ): Promise<TransactionsResponse> {
   if (!customerId) {
     throw new Error("customerId is required");
@@ -1807,12 +1944,14 @@ export async function getCustomerTransactions(
     `${API_URL}/api/transactions/customer/${customerId}?${params.toString()}`,
     {
       method: "GET",
-    }
+    },
   );
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
-    throw new Error(errorBody.message || "Failed to fetch customer transactions");
+    throw new Error(
+      errorBody.message || "Failed to fetch customer transactions",
+    );
   }
 
   return await response.json();
@@ -1824,8 +1963,12 @@ export async function getCustomerTransactions(
  */
 export async function recalculateCustomerTiers(
   storeId: string,
-  channelId: string
-): Promise<{ success: boolean; message: string; data: { updated: number; unchanged: number; total: number } }> {
+  channelId: string,
+): Promise<{
+  success: boolean;
+  message: string;
+  data: { updated: number; unchanged: number; total: number };
+}> {
   if (!storeId || !channelId) {
     throw new Error("storeId and channelId are required");
   }
@@ -1841,12 +1984,14 @@ export async function recalculateCustomerTiers(
         storeId,
         channelId,
       }),
-    }
+    },
   );
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
-    throw new Error(errorBody.message || "Failed to recalculate customer tiers");
+    throw new Error(
+      errorBody.message || "Failed to recalculate customer tiers",
+    );
   }
 
   return await response.json();
@@ -1883,12 +2028,20 @@ export interface BulkImportResponse {
 }
 
 export async function bulkImportPoints(
-  request: BulkImportRequest
+  request: BulkImportRequest,
 ): Promise<BulkImportResponse> {
   const { storeId, channelId, importType, customers } = request;
 
-  if (!storeId || !channelId || !importType || !customers || !Array.isArray(customers)) {
-    throw new Error("Missing required fields: storeId, channelId, importType, customers");
+  if (
+    !storeId ||
+    !channelId ||
+    !importType ||
+    !customers ||
+    !Array.isArray(customers)
+  ) {
+    throw new Error(
+      "Missing required fields: storeId, channelId, importType, customers",
+    );
   }
 
   const response = await fetchWithAuth(
@@ -1904,7 +2057,7 @@ export async function bulkImportPoints(
         importType,
         customers,
       }),
-    }
+    },
   );
 
   if (!response.ok) {
@@ -1931,12 +2084,14 @@ export interface PointsAwardedStatsResponse {
   };
 }
 
-// Get points awarded statistics for dashboard
+/**
+ * Get points awarded statistics for dashboard
+ */
 export async function getPointsAwardedStats(
   storeId: string,
   channelId: number,
   startDate: string,
-  endDate: string
+  endDate: string,
 ): Promise<PointsAwardedStatsResponse> {
   console.log("📥 Fetching points awarded stats:", {
     storeId,
@@ -1956,7 +2111,7 @@ export async function getPointsAwardedStats(
     `${API_URL}/api/transactions/points-awarded-stats?${queryParams.toString()}`,
     {
       method: "GET",
-    }
+    },
   );
 
   if (!response.ok) {
@@ -1965,11 +2120,242 @@ export async function getPointsAwardedStats(
     throw new Error(
       errorBody.message ||
         errorBody.error ||
-        "Failed to fetch points awarded statistics"
+        "Failed to fetch points awarded stats",
     );
   }
 
   const result = await response.json();
   console.log("✅ Points awarded stats fetched successfully:", result);
   return result;
+}
+
+// Payment API Functions
+export interface CreateOrderResponse {
+  id: string;
+}
+
+export interface CapturePaymentResponse {
+  success: boolean;
+  payment: {
+    id: string;
+    status: string;
+    amount: string;
+    currency: string;
+    payer: any;
+  };
+  amount: string;
+  subscription?: {
+    id: string;
+    status: string;
+    planId: string;
+    storeId: string;
+    nextBillingDate: string;
+    trialEndsAt: string | null;
+  } | null;
+}
+
+/**
+ * Create a PayPal order
+ */
+export async function createPayPalOrder(
+  value: string,
+  currency: string = "USD",
+  userId?: string,
+  channelId?: string,
+  storeId?: string,
+  returnUrl?: string,
+  cancelUrl?: string,
+): Promise<CreateOrderResponse> {
+  console.log("📥 Creating PayPal order:", {
+    value,
+    currency,
+    userId,
+    channelId,
+    storeId,
+  });
+
+  const response = await fetchWithAuth(`${API_URL}/api/payment/create-order`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      value,
+      currency,
+      userId,
+      channelId,
+      storeId,
+      returnUrl,
+      cancelUrl,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error creating PayPal order:", errorBody);
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to create PayPal order",
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ PayPal order created successfully:", result);
+  return result;
+}
+
+/**
+ * Capture a PayPal payment
+ */
+export async function capturePayPalPayment(
+  orderID: string,
+  storeId?: string,
+  planId?: string,
+  selectedOrderLimit?: number,
+  billingInterval?: string,
+): Promise<CapturePaymentResponse> {
+  console.log("📥 Capturing PayPal payment:", {
+    orderID,
+    storeId,
+    planId,
+    selectedOrderLimit,
+    billingInterval,
+  });
+
+  const response = await fetchWithAuth(
+    `${API_URL}/api/payment/capture-payment`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        orderID,
+        storeId,
+        planId,
+        selectedOrderLimit,
+        billingInterval,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error capturing PayPal payment:", errorBody);
+    throw new Error(
+      errorBody.message ||
+        errorBody.error ||
+        "Failed to capture PayPal payment",
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ PayPal payment captured successfully:", result);
+  return result;
+}
+
+// ============================================
+// Webhook API Functions
+// ============================================
+
+/**
+ * Subscribe to a BigCommerce webhook
+ */
+export async function subscribeWebhook(
+  scope: string,
+  channelId?: string,
+): Promise<{ status: boolean; message: string; data: any }> {
+  const response = await fetchWithAuth(`${API_URL}/api/webhooks/subscribe`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      scope,
+      channelId: channelId || null,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to subscribe webhook",
+    );
+  }
+
+  return await response.json();
+}
+
+/**
+ * Get all webhooks for the current store
+ */
+export async function getAllWebhooks(): Promise<{
+  status: boolean;
+  message: string;
+  data: any[];
+}> {
+  const response = await fetchWithAuth(`${API_URL}/api/webhooks`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to fetch webhooks",
+    );
+  }
+
+  return await response.json();
+}
+
+/**
+ * Get webhook logs
+ */
+export async function getWebhookLogs(options?: {
+  channelId?: string;
+  scope?: string;
+  limit?: number;
+}): Promise<{
+  status: boolean;
+  message: string;
+  data: any[];
+  count: number;
+}> {
+  const params = new URLSearchParams();
+  if (options?.channelId) params.append("channelId", options.channelId);
+  if (options?.scope) params.append("scope", options.scope);
+  if (options?.limit) params.append("limit", options.limit.toString());
+
+  const url = `${API_URL}/api/webhooks/logs${params.toString() ? `?${params.toString()}` : ""}`;
+  const response = await fetchWithAuth(url, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to fetch webhook logs",
+    );
+  }
+
+  return await response.json();
+}
+
+/**
+ * Unsubscribe from a webhook
+ */
+export async function unsubscribeWebhook(
+  webhookId: string,
+): Promise<{ status: boolean; message: string }> {
+  const response = await fetchWithAuth(`${API_URL}/api/webhooks/${webhookId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.message || errorBody.error || "Failed to unsubscribe webhook",
+    );
+  }
+
+  return await response.json();
 }

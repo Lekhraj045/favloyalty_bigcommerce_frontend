@@ -1,19 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useAppSelector } from "@/store/hooks";
+import type { BigCommerceProduct } from "@/utils/api";
+import {
+  createRedeemCoupon,
+  getStoreId,
+  updateRedeemCoupon,
+  type CreateRedeemCouponData,
+  type RedeemCoupon,
+} from "@/utils/api";
 import { Button } from "@heroui/button";
 import { Switch } from "@heroui/switch";
-import { ArrowLeft } from "lucide-react";
-import { useAppSelector } from "@/store/hooks";
-import { getStoreId } from "@/utils/api";
-import { createRedeemCoupon, updateRedeemCoupon, type CreateRedeemCouponData, type RedeemCoupon } from "@/utils/api";
 import { addToast } from "@heroui/toast";
-import { useEffect } from "react";
+import { ArrowLeft } from "lucide-react";
+import { useEffect, useState } from "react";
 import ProductTable from "../percentage-discount/components/ProductTable";
-import ProductSearchDropdown from "./ProductSearchDropdown";
-import CustomerTierSelection from "./CustomerTierSelection";
 import { validateTiers } from "../utils/tierValidation";
-import type { BigCommerceProduct } from "@/utils/api";
+import CustomerTierSelection from "./CustomerTierSelection";
+import ProductSearchDropdown from "./ProductSearchDropdown";
 
 interface PercentageDiscountFormProps {
   onBack: () => void;
@@ -37,17 +41,27 @@ export default function PercentageDiscountForm({
   const [pointValue, setPointValue] = useState<string>("");
   const [discountAmount, setDiscountAmount] = useState<string>("");
   const [expireCoupon, setExpireCoupon] = useState<string>("");
-  const [allowCouponForProduct, setAllowCouponForProduct] = useState<boolean>(true); // true = OFF (no restriction)
-  const [currentRestrictionType, setCurrentRestrictionType] = useState<"product" | "collection">("product");
-  const [selectedItems, setSelectedItems] = useState<CreateRedeemCouponData["selectedItems"]>([]);
-  const [selectedCollections, setSelectedCollections] = useState<CreateRedeemCouponData["selectedCollections"]>([]);
-  const [selectedTiers, setSelectedTiers] = useState<Array<{
-    status: boolean;
-    name: string;
-    tierId: string;
-    tierIndex: number;
-  }>>([]);
-  const [customerRestrictionEnabled, setCustomerRestrictionEnabled] = useState<boolean>(true); // true = disabled (no restriction)
+  const [allowCouponForProduct, setAllowCouponForProduct] =
+    useState<boolean>(true); // true = OFF (no restriction)
+  const [currentRestrictionType, setCurrentRestrictionType] = useState<
+    "product" | "collection"
+  >("product");
+  const [selectedItems, setSelectedItems] = useState<
+    CreateRedeemCouponData["selectedItems"]
+  >([]);
+  const [selectedCollections, setSelectedCollections] = useState<
+    CreateRedeemCouponData["selectedCollections"]
+  >([]);
+  const [selectedTiers, setSelectedTiers] = useState<
+    Array<{
+      status: boolean;
+      name: string;
+      tierId: string;
+      tierIndex: number;
+    }>
+  >([]);
+  const [customerRestrictionEnabled, setCustomerRestrictionEnabled] =
+    useState<boolean>(true); // true = disabled (no restriction)
   const [loading, setLoading] = useState(false);
 
   // Load coupon data when editing, or reset form when creating new
@@ -56,7 +70,7 @@ export default function PercentageDiscountForm({
       // Pre-populate form fields with existing coupon data
       setPointValue(coupon.coupon.value?.toString() || "");
       setDiscountAmount(coupon.coupon.discountAmount?.toString() || "");
-      
+
       // Handle expiry - convert days to string if hasExpiry is true
       if (coupon.coupon.hasExpiry && coupon.coupon.expire) {
         // expire might be a number (days) or string, convert to string
@@ -68,12 +82,16 @@ export default function PercentageDiscountForm({
       // Handle product/collection restrictions
       if (coupon.coupon.restriction) {
         // Check if product restriction is enabled
-        const productRestrictionEnabled = coupon.coupon.restriction.selectedItems?.status || false;
-        const collectionRestrictionEnabled = coupon.coupon.restriction.selectedCollections?.status || false;
-        
+        const productRestrictionEnabled =
+          coupon.coupon.restriction.selectedItems?.status || false;
+        const collectionRestrictionEnabled =
+          coupon.coupon.restriction.selectedCollections?.status || false;
+
         // Set restriction toggle (true = OFF, false = ON)
-        setAllowCouponForProduct(!(productRestrictionEnabled || collectionRestrictionEnabled));
-        
+        setAllowCouponForProduct(
+          !(productRestrictionEnabled || collectionRestrictionEnabled)
+        );
+
         // Set restriction type
         if (productRestrictionEnabled) {
           setCurrentRestrictionType("product");
@@ -83,29 +101,34 @@ export default function PercentageDiscountForm({
 
         // Load selected items
         if (coupon.coupon.restriction.selectedItems?.items) {
-          const items = coupon.coupon.restriction.selectedItems.items.map((item) => ({
-            value: item.value,
-            type: item.types,
-            src: item.imgUrl,
-            pointRequired: item.pointRequired,
-            productUrl: item.itemUrl,
-            ids: item.ids,
-            price: item.price,
-            variantId: item.variantId,
-            productId: item.productId,
-          }));
+          const items = coupon.coupon.restriction.selectedItems.items.map(
+            (item) => ({
+              value: item.value,
+              type: item.types,
+              src: item.imgUrl,
+              pointRequired: item.pointRequired,
+              productUrl: item.itemUrl,
+              ids: item.ids,
+              price: item.price,
+              variantId: item.variantId,
+              productId: item.productId,
+            })
+          );
           setSelectedItems(items);
         }
 
         // Load selected collections
         if (coupon.coupon.restriction.selectedCollections?.collections) {
-          const collections = coupon.coupon.restriction.selectedCollections.collections.map((col) => ({
-            value: col.value,
-            src: col.imgUrl,
-            collectionUrl: col.collectionUrl,
-            ids: col.ids,
-            pointRequired: col.pointRequired,
-          }));
+          const collections =
+            coupon.coupon.restriction.selectedCollections.collections.map(
+              (col) => ({
+                value: col.value,
+                src: col.imgUrl,
+                collectionUrl: col.collectionUrl,
+                ids: col.ids,
+                pointRequired: col.pointRequired,
+              })
+            );
           setSelectedCollections(collections);
         }
       } else {
@@ -160,41 +183,43 @@ export default function PercentageDiscountForm({
   const handlePointValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     // Remove any decimal points and non-numeric characters except empty string
-    let wholeNumber = value.replace(/[^\d]/g, '');
-    
+    let wholeNumber = value.replace(/[^\d]/g, "");
+
     // Enforce maximum value of 100000
     if (wholeNumber && parseInt(wholeNumber) > 100000) {
-      wholeNumber = '100000';
+      wholeNumber = "100000";
     }
-    
+
     setPointValue(wholeNumber);
-    
+
     // Clear error if value is now valid
     if (errors.pointValue && wholeNumber) {
       const num = parseInt(wholeNumber);
       if (!isNaN(num) && num >= 1 && num <= 100000) {
-        setErrors(prev => ({ ...prev, pointValue: undefined }));
+        setErrors((prev) => ({ ...prev, pointValue: undefined }));
       }
     }
   };
 
-  const handleDiscountAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDiscountAmountChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const value = e.target.value;
     // Remove any decimal points and non-numeric characters except empty string
-    let wholeNumber = value.replace(/[^\d]/g, '');
-    
+    let wholeNumber = value.replace(/[^\d]/g, "");
+
     // Enforce maximum value of 100
     if (wholeNumber && parseInt(wholeNumber) > 100) {
-      wholeNumber = '100';
+      wholeNumber = "100";
     }
-    
+
     setDiscountAmount(wholeNumber);
-    
+
     // Clear error if value is now valid
     if (errors.discountAmount && wholeNumber) {
       const num = parseInt(wholeNumber);
       if (!isNaN(num) && num >= 1 && num <= 100) {
-        setErrors(prev => ({ ...prev, discountAmount: undefined }));
+        setErrors((prev) => ({ ...prev, discountAmount: undefined }));
       }
     }
   };
@@ -202,20 +227,20 @@ export default function PercentageDiscountForm({
   const handleExpireCouponChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     // Remove any decimal points and non-numeric characters except empty string
-    let wholeNumber = value.replace(/[^\d]/g, '');
-    
+    let wholeNumber = value.replace(/[^\d]/g, "");
+
     // Enforce maximum value of 365
     if (wholeNumber && parseInt(wholeNumber) > 365) {
-      wholeNumber = '365';
+      wholeNumber = "365";
     }
-    
+
     setExpireCoupon(wholeNumber);
-    
+
     // Clear error if value is now valid
     if (errors.expireCoupon && wholeNumber) {
       const num = parseInt(wholeNumber);
       if (!isNaN(num) && num >= 1 && num <= 365) {
-        setErrors(prev => ({ ...prev, expireCoupon: undefined }));
+        setErrors((prev) => ({ ...prev, expireCoupon: undefined }));
       }
     }
   };
@@ -225,21 +250,34 @@ export default function PercentageDiscountForm({
 
     // Validate pointValue (1-100,000) - only whole numbers
     const pointValueNum = parseInt(pointValue);
-    if (!pointValue || isNaN(pointValueNum) || pointValueNum < 1 || pointValueNum > 100000) {
-      newErrors.pointValue = "Point value must be between 1 and 1,00,000 (whole numbers only)";
+    if (
+      !pointValue ||
+      isNaN(pointValueNum) ||
+      pointValueNum < 1 ||
+      pointValueNum > 100000
+    ) {
+      newErrors.pointValue =
+        "Point value must be between 1 and 1,00,000 (whole numbers only)";
     }
 
     // Validate discountAmount (1-100) - only whole numbers
     const discountAmountNum = parseInt(discountAmount);
-    if (!discountAmount || isNaN(discountAmountNum) || discountAmountNum < 1 || discountAmountNum > 100) {
-      newErrors.discountAmount = "Discount amount must be between 1 and 100 (whole numbers only)";
+    if (
+      !discountAmount ||
+      isNaN(discountAmountNum) ||
+      discountAmountNum < 1 ||
+      discountAmountNum > 100
+    ) {
+      newErrors.discountAmount =
+        "Discount amount must be between 1 and 100 (whole numbers only)";
     }
 
     // Validate expireCoupon (optional, but if provided must be 1-365) - only whole numbers
     if (expireCoupon.trim() !== "") {
       const expireNum = parseInt(expireCoupon);
       if (isNaN(expireNum) || expireNum < 1 || expireNum > 365) {
-        newErrors.expireCoupon = "Expiry days must be between 1 and 365 (whole numbers only)";
+        newErrors.expireCoupon =
+          "Expiry days must be between 1 and 365 (whole numbers only)";
       }
     }
 
@@ -296,15 +334,20 @@ export default function PercentageDiscountForm({
       let result;
       if (isEditMode && coupon?._id) {
         // Update existing coupon
-        result = await updateRedeemCoupon(coupon._id, storeId, channelId, couponData);
-        
+        result = await updateRedeemCoupon(
+          coupon._id,
+          storeId,
+          channelId,
+          couponData
+        );
+
         if (result.success) {
           addToast({
             title: "Success",
             description: "Percentage discount coupon updated successfully",
             color: "success",
           });
-          
+
           // Call success callback or go back
           if (onSuccess) {
             onSuccess();
@@ -315,14 +358,14 @@ export default function PercentageDiscountForm({
       } else {
         // Create new coupon
         result = await createRedeemCoupon(storeId, channelId, couponData);
-        
+
         if (result.success) {
           addToast({
             title: "Success",
             description: "Percentage discount coupon created successfully",
             color: "success",
           });
-          
+
           // Reset form
           setPointValue("");
           setDiscountAmount("");
@@ -332,7 +375,7 @@ export default function PercentageDiscountForm({
           setSelectedCollections([]);
           setCustomerRestrictionEnabled(true);
           setSelectedTiers([]);
-          
+
           // Call success callback or go back
           if (onSuccess) {
             onSuccess();
@@ -365,7 +408,9 @@ export default function PercentageDiscountForm({
             <ArrowLeft size={20} color="#000000" strokeWidth={2} />
           </button>
           <h2 className="text-base font-bold">
-            {isEditMode ? "Edit Percentage Discount Coupon" : "Create Percentage Discount Coupon"}
+            {isEditMode
+              ? "Edit Percentage Discount Coupon"
+              : "Create Percentage Discount Coupon"}
           </h2>
         </div>
 
@@ -396,7 +441,10 @@ export default function PercentageDiscountForm({
                     return;
                   }
                   // Ensure that it is a number and stop the keypress
-                  if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                  if (
+                    (e.shiftKey || e.keyCode < 48 || e.keyCode > 57) &&
+                    (e.keyCode < 96 || e.keyCode > 105)
+                  ) {
                     e.preventDefault();
                   }
                 }}
@@ -405,7 +453,11 @@ export default function PercentageDiscountForm({
                   if (pointValue) {
                     const num = parseInt(pointValue);
                     if (isNaN(num) || num < 1 || num > 100000) {
-                      setErrors(prev => ({ ...prev, pointValue: "Point value must be between 1 and 1,00,000 (whole numbers only)" }));
+                      setErrors((prev) => ({
+                        ...prev,
+                        pointValue:
+                          "Point value must be between 1 and 1,00,000 (whole numbers only)",
+                      }));
                     }
                   }
                 }}
@@ -444,7 +496,10 @@ export default function PercentageDiscountForm({
                     return;
                   }
                   // Ensure that it is a number and stop the keypress
-                  if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                  if (
+                    (e.shiftKey || e.keyCode < 48 || e.keyCode > 57) &&
+                    (e.keyCode < 96 || e.keyCode > 105)
+                  ) {
                     e.preventDefault();
                   }
                 }}
@@ -453,7 +508,11 @@ export default function PercentageDiscountForm({
                   if (discountAmount) {
                     const num = parseInt(discountAmount);
                     if (isNaN(num) || num < 1 || num > 100) {
-                      setErrors(prev => ({ ...prev, discountAmount: "Discount amount must be between 1 and 100 (whole numbers only)" }));
+                      setErrors((prev) => ({
+                        ...prev,
+                        discountAmount:
+                          "Discount amount must be between 1 and 100 (whole numbers only)",
+                      }));
                     }
                   }
                 }}
@@ -463,7 +522,9 @@ export default function PercentageDiscountForm({
                 }`}
               />
               {errors.discountAmount && (
-                <p className="text-xs text-red-500 mt-1">{errors.discountAmount}</p>
+                <p className="text-xs text-red-500 mt-1">
+                  {errors.discountAmount}
+                </p>
               )}
             </div>
           </div>
@@ -493,7 +554,10 @@ export default function PercentageDiscountForm({
                   return;
                 }
                 // Ensure that it is a number and stop the keypress
-                if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                if (
+                  (e.shiftKey || e.keyCode < 48 || e.keyCode > 57) &&
+                  (e.keyCode < 96 || e.keyCode > 105)
+                ) {
                   e.preventDefault();
                 }
               }}
@@ -502,7 +566,11 @@ export default function PercentageDiscountForm({
                 if (expireCoupon.trim()) {
                   const num = parseInt(expireCoupon);
                   if (isNaN(num) || num < 1 || num > 365) {
-                    setErrors(prev => ({ ...prev, expireCoupon: "Expiry days must be between 1 and 365 (whole numbers only)" }));
+                    setErrors((prev) => ({
+                      ...prev,
+                      expireCoupon:
+                        "Expiry days must be between 1 and 365 (whole numbers only)",
+                    }));
                   }
                 }
               }}
@@ -540,13 +608,21 @@ export default function PercentageDiscountForm({
         {!allowCouponForProduct && (
           <div className="p-4 flex flex-col gap-4">
             <h3 className="text-sm font-bold">Add Products/Collections</h3>
+            <p className="text-xs text-gray-500">
+              Only products visible on the selected channel&apos;s storefront
+              are shown, so customers can find and buy them.
+            </p>
 
             <div className="flex gap-3">
               <div className="flex-1 max-w-[120px]">
                 <div className="w-full custom-dropi dropi-withoutLabel relative">
                   <select
                     value={currentRestrictionType}
-                    onChange={(e) => setCurrentRestrictionType(e.target.value as "product" | "collection")}
+                    onChange={(e) =>
+                      setCurrentRestrictionType(
+                        e.target.value as "product" | "collection"
+                      )
+                    }
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="product">Product</option>
@@ -670,4 +746,3 @@ export default function PercentageDiscountForm({
     </div>
   );
 }
-

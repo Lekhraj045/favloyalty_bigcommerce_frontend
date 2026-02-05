@@ -1,18 +1,18 @@
 "use client";
 
-import UpgradeModal from "@/components/UpgradeModal";
 import SetupHeader from "@/components/SetupHeader";
 import SetupNavigation from "@/components/SetupNavigation";
+import UpgradeModal from "@/components/UpgradeModal";
 import { useAppDispatch } from "@/store/hooks";
 import { updateChannelCompletionStatus } from "@/store/slices/channelSlice";
 import {
-    deleteRedeemCoupon,
-    getStorePlan,
-    toggleCouponStatus,
-    StorePlan,
-    updatePageCompletionStatus,
-    updateSetupProgress,
-    type RedeemCoupon,
+  deleteRedeemCoupon,
+  getStorePlan,
+  StorePlan,
+  toggleCouponStatus,
+  updatePageCompletionStatus,
+  updateSetupProgress,
+  type RedeemCoupon,
 } from "@/utils/api";
 import { Button } from "@heroui/button";
 import type { Selection } from "@heroui/table";
@@ -53,11 +53,12 @@ export default function WaysToRedeem() {
   const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
   const [deletingBulk, setDeletingBulk] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
-  
+
   // Plan and upgrade modal state
   const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
-  const [restrictedFeatureName, setRestrictedFeatureName] = useState<string>("");
+  const [restrictedFeatureName, setRestrictedFeatureName] =
+    useState<string>("");
   const hasDisabledPremiumCouponsRef = useRef<boolean>(false);
 
   // Helper function to check if user is on free plan
@@ -80,7 +81,11 @@ export default function WaysToRedeem() {
       } catch (error) {
         console.error("Error loading store plan:", error);
         // Default to free plan if error
-        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null });
+        setStorePlan({
+          plan: "free",
+          trialDaysRemaining: null,
+          paypalSubscriptionId: null,
+        });
       }
     };
     loadStorePlan();
@@ -423,7 +428,7 @@ export default function WaysToRedeem() {
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-col gap-4">
         <div className="head">
-          <SetupHeader />
+          <SetupHeader hideChannelSelector={selectedForm !== null} />
           <SetupNavigation />
         </div>
 
@@ -498,7 +503,7 @@ export default function WaysToRedeem() {
                         Delete All
                       </Button>
                     )}
-                    <WaysModal 
+                    <WaysModal
                       onSelectRedeemType={handleSelectRedeemType}
                       isFreePlan={isFreePlan()}
                       onPremiumClick={showUpgradeModalForFeature}

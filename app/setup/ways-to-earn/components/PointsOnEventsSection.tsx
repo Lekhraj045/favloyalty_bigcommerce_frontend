@@ -51,6 +51,8 @@ export default function PointsOnEventsSection({
     onToggleChange(value);
   };
 
+  const isCustomEvent = formData.name === "Custom Event";
+
   return (
     <div className="card !p-0">
       <div className="flex justify-between items-center gap-6 p-4 border-b border-[#DEDEDE]">
@@ -122,7 +124,14 @@ export default function PointsOnEventsSection({
                   </label>
                   <select
                     value={formData.name}
-                    onChange={(e) => onFormChange("name", e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      onFormChange("name", value);
+                      // Clear custom name when switching away from custom
+                      if (value !== "Custom Event") {
+                        onFormChange("customEventName", "");
+                      }
+                    }}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Event</option>
@@ -139,6 +148,7 @@ export default function PointsOnEventsSection({
                     <option value="New Year">New Year</option>
                     <option value="Diwali">Diwali</option>
                     <option value="Holi">Holi</option>
+                    <option value="Custom Event">Custom Event</option>
                   </select>
                 </div>
               </div>
@@ -146,7 +156,7 @@ export default function PointsOnEventsSection({
               <div className="w-full">
                 <label className="block mb-1 text-[13px]">Date of Event</label>
                 <DatePicker
-                  key={`date-picker-${events.length}-${formData.name || 'empty'}-${formData.points || 'empty'}`}
+                  key={`date-picker-${events.length}-${formData.name || "empty"}-${formData.points || "empty"}`}
                   showMonthAndYearPickers
                   size="sm"
                   value={formData.date || undefined}
@@ -175,12 +185,12 @@ export default function PointsOnEventsSection({
                   value={formData.points}
                   onChange={(e) => {
                     handleIntegerInputChange(e.target.value, (value: string) =>
-                      onFormChange("points", value)
+                      onFormChange("points", value),
                     );
                   }}
                   onBlur={() =>
                     handleInputBlur(formData.points, (value: string) =>
-                      onFormChange("points", value)
+                      onFormChange("points", value),
                     )
                   }
                   onKeyDown={(e) => {
@@ -199,6 +209,41 @@ export default function PointsOnEventsSection({
                 />
               </div>
             </div>
+
+            {isCustomEvent && (
+              <div className="px-4 pb-4 -mt-2">
+                <div className="max-w-[calc((100%-2rem)/3)]">
+                  <Input
+                    label="Custom Event Name"
+                    labelPlacement="outside"
+                    size="sm"
+                    variant="bordered"
+                    value={formData.customEventName || ""}
+                    onChange={(e) =>
+                      onFormChange("customEventName", e.target.value)
+                    }
+                    maxLength={50}
+                    description={`${(formData.customEventName || "").length}/50 characters`}
+                    classNames={{
+                      base: "w-full",
+                      mainWrapper: "gap-1",
+                      inputWrapper: [
+                        "h-8",
+                        "min-h-8",
+                        "bg-[#fdfdfd]",
+                        "border",
+                        "border-[#8a8a8a]",
+                        "rounded-lg",
+                        "px-3",
+                      ].join(" "),
+                      label: "text-[13px] leading-none mb-0",
+                      input: ["text-[13px]"].join(" "),
+                      description: "text-xs text-default-500",
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {events.length > 0 && (

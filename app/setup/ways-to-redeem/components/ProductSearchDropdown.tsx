@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useAppSelector } from "@/store/hooks";
+import { getProducts, getStoreId, type BigCommerceProduct } from "@/utils/api";
 import { Search, X } from "lucide-react";
 import Image from "next/image";
-import { getProducts, type BigCommerceProduct } from "@/utils/api";
-import { getStoreId } from "@/utils/api";
-import { useAppSelector } from "@/store/hooks";
+import { useEffect, useRef, useState } from "react";
 
 interface ProductSearchDropdownProps {
   onSelectProduct: (product: BigCommerceProduct) => void;
@@ -30,7 +29,12 @@ export default function ProductSearchDropdown({
     (state) => state.channel.selectedChannel
   );
   const storeId = getStoreId();
-  const channelId = selectedChannel?.id || null;
+  // Use MongoDB _id when available (from GET /channels); fallback to BigCommerce channel_id (e.g. login flow) so products are always filtered by selected channel
+  const channelId =
+    selectedChannel?.id ??
+    (selectedChannel?.channel_id != null
+      ? String(selectedChannel.channel_id)
+      : null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -167,11 +171,14 @@ export default function ProductSearchDropdown({
             <div className="p-4 text-center text-sm text-red-500">{error}</div>
           )}
 
-          {!loading && !error && products.length === 0 && searchQuery.trim() && (
-            <div className="p-4 text-center text-sm text-gray-500">
-              No products found
-            </div>
-          )}
+          {!loading &&
+            !error &&
+            products.length === 0 &&
+            searchQuery.trim() && (
+              <div className="p-4 text-center text-sm text-gray-500">
+                No products found
+              </div>
+            )}
 
           {!loading && !error && products.length > 0 && (
             <div className="py-2">
@@ -191,7 +198,8 @@ export default function ProductSearchDropdown({
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           // Fallback to placeholder if image fails to load
-                          (e.target as HTMLImageElement).src = `${process.env.NEXT_PUBLIC_BASE_PATH}/images/placeholder-product.png`;
+                          (e.target as HTMLImageElement).src =
+                            `${process.env.NEXT_PUBLIC_BASE_PATH}/images/placeholder-product.png`;
                         }}
                       />
                     ) : (
@@ -219,4 +227,3 @@ export default function ProductSearchDropdown({
     </div>
   );
 }
-

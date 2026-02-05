@@ -7,7 +7,10 @@ import type { Event, EventFormData } from "./types";
  * These functions are specific to the ways-to-earn page
  */
 export const createEventFromForm = (formData: EventFormData): Event | null => {
-  const trimmedEventName = formData.name?.trim() || "";
+  const selectedName = formData.name?.trim() || "";
+  const isCustomEvent = selectedName === "Custom Event";
+  const trimmedCustomName = (formData.customEventName || "").trim();
+  const trimmedEventName = isCustomEvent ? trimmedCustomName : selectedName;
   const trimmedEventPoints = formData.points?.trim() || "";
 
   if (
@@ -18,8 +21,18 @@ export const createEventFromForm = (formData: EventFormData): Event | null => {
   ) {
     addToast({
       title: "Validation Error",
-      description:
-        "Please fill in all fields: Event Name, Date of Event, and Points",
+      description: isCustomEvent
+        ? "Please fill in all fields: Custom Event Name, Date of Event, and Points"
+        : "Please fill in all fields: Event Name, Date of Event, and Points",
+      color: "danger",
+    });
+    return null;
+  }
+
+  if (isCustomEvent && trimmedCustomName.length > 50) {
+    addToast({
+      title: "Validation Error",
+      description: "Custom Event Name must be 50 characters or fewer",
       color: "danger",
     });
     return null;
@@ -59,7 +72,7 @@ export const createEventFromForm = (formData: EventFormData): Event | null => {
   const eventDateObj = new Date(
     formData.date.year,
     formData.date.month - 1,
-    formData.date.day
+    formData.date.day,
   );
 
   // Check if event date is today (for isImmediate)
@@ -95,7 +108,7 @@ export const convertEventToFormData = (event: Event): EventFormData => {
   const calendarDate = new CalendarDate(
     date.getFullYear(),
     date.getMonth() + 1,
-    date.getDate()
+    date.getDate(),
   );
   return {
     name: event.name,

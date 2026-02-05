@@ -13,6 +13,8 @@ interface WaysToEarnSectionProps {
   onReferEarnChange: (enabled: boolean, points: string) => void;
   onProfileCompletionChange: (enabled: boolean, points: string) => void;
   onNewsletterChange: (enabled: boolean, points: string) => void;
+  /** Currency code for "Every purchase (Per X spent)" label (e.g. INR, USD). Defaults to INR. */
+  everyPurchaseCurrency?: string;
   isFreePlan?: boolean;
   onPremiumClick?: (featureName: string) => void;
 }
@@ -30,6 +32,7 @@ export default function WaysToEarnSection({
   onReferEarnChange,
   onProfileCompletionChange,
   onNewsletterChange,
+  everyPurchaseCurrency = "INR",
   isFreePlan = false,
   onPremiumClick,
 }: WaysToEarnSectionProps) {
@@ -50,7 +53,7 @@ export default function WaysToEarnSection({
         />
 
         <ToggleInputField
-          label="Every purchase (Per INR spent)"
+          label={`Every purchase (Per ${everyPurchaseCurrency} spent)`}
           enabled={everyPurchase.enabled}
           points={everyPurchase.points}
           onToggleChange={(enabled) =>
@@ -123,4 +126,3 @@ export default function WaysToEarnSection({
     </div>
   );
 }
-

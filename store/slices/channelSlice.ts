@@ -64,7 +64,7 @@ export const fetchChannels = createAsyncThunk(
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to fetch channels");
     }
-  }
+  },
 );
 
 const channelSlice = createSlice({
@@ -78,7 +78,7 @@ const channelSlice = createSlice({
         if (action.payload) {
           localStorage.setItem(
             "redux_selected_channel",
-            JSON.stringify(action.payload)
+            JSON.stringify(action.payload),
           );
         } else {
           localStorage.removeItem("redux_selected_channel");
@@ -93,7 +93,7 @@ const channelSlice = createSlice({
         if (typeof window !== "undefined") {
           localStorage.setItem(
             "redux_selected_channel",
-            JSON.stringify(action.payload[0])
+            JSON.stringify(action.payload[0]),
           );
         }
       }
@@ -117,7 +117,7 @@ const channelSlice = createSlice({
           | "waysToRedeem"
           | "customiseWidget";
         completed: boolean;
-      }>
+      }>,
     ) => {
       const { channelId, pageType, completed } = action.payload;
       const fieldMap = {
@@ -142,7 +142,7 @@ const channelSlice = createSlice({
 
       // Update in channels array
       const channelIndex = state.channels.findIndex(
-        (ch) => ch.id === channelId
+        (ch) => ch.id === channelId,
       );
       if (channelIndex !== -1) {
         const updatedChannel = {
@@ -161,13 +161,15 @@ const channelSlice = createSlice({
           [fieldName]: completed,
         };
         // Calculate and update setupprogress
-        updatedSelectedChannel.setupprogress = calculateSetupProgress(updatedSelectedChannel);
+        updatedSelectedChannel.setupprogress = calculateSetupProgress(
+          updatedSelectedChannel,
+        );
         state.selectedChannel = updatedSelectedChannel;
         // Persist updated selectedChannel to localStorage
         if (typeof window !== "undefined") {
           localStorage.setItem(
             "redux_selected_channel",
-            JSON.stringify(state.selectedChannel)
+            JSON.stringify(state.selectedChannel),
           );
         }
       }
@@ -193,7 +195,7 @@ const channelSlice = createSlice({
           if (typeof window !== "undefined") {
             localStorage.setItem(
               "redux_selected_channel",
-              JSON.stringify(action.payload[0])
+              JSON.stringify(action.payload[0]),
             );
           }
         }
@@ -213,5 +215,31 @@ export const {
   clearError,
   updateChannelCompletionStatus,
 } = channelSlice.actions;
+
+// Additional reducer to update widget visibility for a specific channel
+export const updateChannelWidgetVisibility =
+  (channelId: string, visible: boolean) => (dispatch: any, getState: any) => {
+    const state = getState().channel as ChannelState;
+
+    // Update channels array
+    const updatedChannels = state.channels.map((channel) =>
+      channel.id === channelId
+        ? { ...channel, widget_visibility: visible }
+        : channel,
+    );
+
+    // Update selectedChannel if it matches
+    let updatedSelectedChannel = state.selectedChannel;
+    if (state.selectedChannel?.id === channelId) {
+      updatedSelectedChannel = {
+        ...state.selectedChannel,
+        widget_visibility: visible,
+      };
+    }
+
+    // Dispatch core reducers to update state & localStorage
+    dispatch(setChannels(updatedChannels));
+    dispatch(setSelectedChannel(updatedSelectedChannel || null));
+  };
 
 export default channelSlice.reducer;

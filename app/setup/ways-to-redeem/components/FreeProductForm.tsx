@@ -1,17 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Button } from "@heroui/button";
-import { ArrowLeft, Search } from "lucide-react";
 import { useAppSelector } from "@/store/hooks";
-import { getStoreId } from "@/utils/api";
-import { createRedeemCoupon, updateRedeemCoupon, type CreateRedeemCouponData, type RedeemCoupon } from "@/utils/api";
-import { addToast } from "@heroui/toast";
-import ProductSearchDropdown from "./ProductSearchDropdown";
-import FreeProductTable from "../free-product/components/FreeProductTable";
-import CustomerTierSelection from "./CustomerTierSelection";
-import { validateTiers } from "../utils/tierValidation";
 import type { BigCommerceProduct } from "@/utils/api";
+import {
+  createRedeemCoupon,
+  getStoreId,
+  updateRedeemCoupon,
+  type CreateRedeemCouponData,
+  type RedeemCoupon,
+} from "@/utils/api";
+import { Button } from "@heroui/button";
+import { addToast } from "@heroui/toast";
+import { ArrowLeft, Search } from "lucide-react";
+import { useEffect, useState } from "react";
+import FreeProductTable from "../free-product/components/FreeProductTable";
+import { validateTiers } from "../utils/tierValidation";
+import CustomerTierSelection from "./CustomerTierSelection";
+import ProductSearchDropdown from "./ProductSearchDropdown";
 
 interface FreeProductFormProps {
   onBack: () => void;
@@ -36,14 +41,19 @@ export default function FreeProductForm({
   const isEditMode = !!coupon;
 
   const [expireCoupon, setExpireCoupon] = useState<string>("");
-  const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
-  const [selectedTiers, setSelectedTiers] = useState<Array<{
-    status: boolean;
-    name: string;
-    tierId: string;
-    tierIndex: number;
-  }>>([]);
-  const [customerRestrictionEnabled, setCustomerRestrictionEnabled] = useState<boolean>(true); // true = disabled (no restriction)
+  const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>(
+    []
+  );
+  const [selectedTiers, setSelectedTiers] = useState<
+    Array<{
+      status: boolean;
+      name: string;
+      tierId: string;
+      tierIndex: number;
+    }>
+  >([]);
+  const [customerRestrictionEnabled, setCustomerRestrictionEnabled] =
+    useState<boolean>(true); // true = disabled (no restriction)
   const [loading, setLoading] = useState(false);
 
   // Validation errors
@@ -64,18 +74,20 @@ export default function FreeProductForm({
 
       // Load selected products
       if (coupon.coupon.restriction?.selectedItems?.items) {
-        const products = coupon.coupon.restriction.selectedItems.items.map((item) => ({
-          id: parseInt(item.ids || "0"),
-          name: item.value,
-          sku: "",
-          price: item.price || "0.00",
-          description: "",
-          imageUrl: item.imgUrl,
-          url: item.itemUrl || "",
-          isVisible: true,
-          type: "physical",
-          pointRequired: item.pointRequired || "1",
-        }));
+        const products = coupon.coupon.restriction.selectedItems.items.map(
+          (item) => ({
+            id: parseInt(item.ids || "0"),
+            name: item.value,
+            sku: "",
+            price: item.price || "0.00",
+            description: "",
+            imageUrl: item.imgUrl,
+            url: item.itemUrl || "",
+            isVisible: true,
+            type: "physical",
+            pointRequired: item.pointRequired || "1",
+          })
+        );
         setSelectedProducts(products);
       } else {
         setSelectedProducts([]);
@@ -112,20 +124,20 @@ export default function FreeProductForm({
   const handleExpireCouponChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     // Remove any decimal points and non-numeric characters except empty string
-    let wholeNumber = value.replace(/[^\d]/g, '');
-    
+    let wholeNumber = value.replace(/[^\d]/g, "");
+
     // Enforce maximum value of 365
     if (wholeNumber && parseInt(wholeNumber) > 365) {
-      wholeNumber = '365';
+      wholeNumber = "365";
     }
-    
+
     setExpireCoupon(wholeNumber);
-    
+
     // Clear error if value is now valid
     if (errors.expireCoupon && wholeNumber) {
       const num = parseInt(wholeNumber);
       if (!isNaN(num) && num >= 1 && num <= 365) {
-        setErrors(prev => ({ ...prev, expireCoupon: undefined }));
+        setErrors((prev) => ({ ...prev, expireCoupon: undefined }));
       }
     }
   };
@@ -148,13 +160,13 @@ export default function FreeProductForm({
   const handlePointRequiredChange = (index: number, value: string) => {
     const newProducts = [...selectedProducts];
     // Remove any decimal points and non-numeric characters except empty string
-    let wholeNumber = value.replace(/[^\d]/g, '');
-    
+    let wholeNumber = value.replace(/[^\d]/g, "");
+
     // Enforce maximum value of 999999
     if (wholeNumber && parseInt(wholeNumber) > 999999) {
-      wholeNumber = '999999';
+      wholeNumber = "999999";
     }
-    
+
     newProducts[index].pointRequired = wholeNumber;
     setSelectedProducts(newProducts);
   };
@@ -166,7 +178,8 @@ export default function FreeProductForm({
     if (expireCoupon.trim() !== "") {
       const expireNum = parseInt(expireCoupon);
       if (isNaN(expireNum) || expireNum < 1 || expireNum > 365) {
-        newErrors.expireCoupon = "Expiry days must be between 1 and 365 (whole numbers only)";
+        newErrors.expireCoupon =
+          "Expiry days must be between 1 and 365 (whole numbers only)";
       }
     }
 
@@ -178,7 +191,12 @@ export default function FreeProductForm({
     // Validate point required for each product
     selectedProducts.forEach((product, index) => {
       const points = parseInt(product.pointRequired);
-      if (!product.pointRequired || isNaN(points) || points < 1 || points > 999999) {
+      if (
+        !product.pointRequired ||
+        isNaN(points) ||
+        points < 1 ||
+        points > 999999
+      ) {
         newErrors.products = "All products must have valid points (1-999,999)";
       }
     });
@@ -225,11 +243,22 @@ export default function FreeProductForm({
       // Validate and fix tierIds to ensure they're valid ObjectIds
       const validatedTiers = validateTiers(selectedTiers);
 
-      // Prepare coupon data for free product
+      // Prepare coupon data for free product (pointValue = min of product points for list/widget display)
+      const pointRange = selectedProducts.length
+        ? (() => {
+            const points = selectedProducts
+              .map((p) => parseInt(p.pointRequired, 10) || 0)
+              .filter((p) => p > 0);
+            return points.length
+              ? { min: Math.min(...points), max: Math.max(...points) }
+              : { min: 0, max: 0 };
+          })()
+        : { min: 0, max: 0 };
+
       const couponData: CreateRedeemCouponData = {
         redeemType: "freeProduct",
         target_type: "line_item",
-        pointValue: 0, // Not used for free product
+        pointValue: pointRange.min || 0,
         expire: expireCoupon.trim() === "" ? null : expireCoupon.trim(),
         selectedItems: selectedItems,
         selectedCollections: [],
@@ -248,15 +277,20 @@ export default function FreeProductForm({
       let result;
       if (isEditMode && coupon?._id) {
         // Update existing coupon
-        result = await updateRedeemCoupon(coupon._id, storeId, channelId, couponData);
-        
+        result = await updateRedeemCoupon(
+          coupon._id,
+          storeId,
+          channelId,
+          couponData
+        );
+
         if (result.success) {
           addToast({
             title: "Success",
             description: "Free product coupon updated successfully",
             color: "success",
           });
-          
+
           // Call success callback or go back
           if (onSuccess) {
             onSuccess();
@@ -267,20 +301,20 @@ export default function FreeProductForm({
       } else {
         // Create new coupon
         result = await createRedeemCoupon(storeId, channelId, couponData);
-        
+
         if (result.success) {
           addToast({
             title: "Success",
             description: "Free product coupon created successfully",
             color: "success",
           });
-          
+
           // Reset form
           setExpireCoupon("");
           setSelectedProducts([]);
           setCustomerRestrictionEnabled(true);
           setSelectedTiers([]);
-          
+
           // Call success callback or go back
           if (onSuccess) {
             onSuccess();
@@ -332,7 +366,9 @@ export default function FreeProductForm({
             <ArrowLeft size={20} color="#000000" strokeWidth={2} />
           </button>
           <h2 className="text-base font-bold">
-            {isEditMode ? "Edit Free Product Coupon" : "Create Free Product Coupon"}
+            {isEditMode
+              ? "Edit Free Product Coupon"
+              : "Create Free Product Coupon"}
           </h2>
         </div>
 
@@ -363,7 +399,10 @@ export default function FreeProductForm({
                   return;
                 }
                 // Ensure that it is a number and stop the keypress
-                if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                if (
+                  (e.shiftKey || e.keyCode < 48 || e.keyCode > 57) &&
+                  (e.keyCode < 96 || e.keyCode > 105)
+                ) {
                   e.preventDefault();
                 }
               }}
@@ -372,7 +411,11 @@ export default function FreeProductForm({
                 if (expireCoupon.trim()) {
                   const num = parseInt(expireCoupon);
                   if (isNaN(num) || num < 1 || num > 365) {
-                    setErrors(prev => ({ ...prev, expireCoupon: "Expiry days must be between 1 and 365 (whole numbers only)" }));
+                    setErrors((prev) => ({
+                      ...prev,
+                      expireCoupon:
+                        "Expiry days must be between 1 and 365 (whole numbers only)",
+                    }));
                   }
                 }
               }}
@@ -397,7 +440,12 @@ export default function FreeProductForm({
         <div className="p-4 border-b border-[#DEDEDE]">
           <h3 className="text-base font-bold mb-1">Eligible Free Products</h3>
           <p className="text-sm text-gray-600">
-            Select the products that customers can get for free with this coupon.
+            Select the products that customers can get for free with this
+            coupon.
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Only products visible on the selected channel&apos;s storefront are
+            shown.
           </p>
         </div>
 
@@ -481,4 +529,3 @@ export default function FreeProductForm({
     </div>
   );
 }
-
