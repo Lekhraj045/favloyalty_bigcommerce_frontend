@@ -44,9 +44,9 @@ export default function WaysToEarn() {
     useState<string>("");
   const hasDisabledFeaturesRef = useRef<boolean>(false);
 
-  // Helper function to check if user is on free plan
+  // Helper function to check if user is on free plan or order limit reached
   const isFreePlan = () => {
-    return storePlan?.plan === "free";
+    return storePlan?.plan === "free" || storePlan?.limitReached === true;
   };
 
   // Helper function to show upgrade modal
@@ -68,17 +68,20 @@ export default function WaysToEarn() {
           plan: "free",
           trialDaysRemaining: null,
           paypalSubscriptionId: null,
+          limitReached: false,
+          orderCount: 0,
+          selectedOrderLimit: 0,
         });
       }
     };
     loadStorePlan();
   }, []);
 
-  // Disable restricted features for free plan users when settings are loaded
+  // Disable restricted features for free plan users or when limit reached when settings are loaded
   useEffect(() => {
     if (
       storePlan &&
-      storePlan.plan === "free" &&
+      (storePlan.plan === "free" || storePlan.limitReached === true) &&
       !settings.loading &&
       !hasDisabledFeaturesRef.current
     ) {

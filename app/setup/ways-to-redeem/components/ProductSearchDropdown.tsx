@@ -2,6 +2,7 @@
 
 import { useAppSelector } from "@/store/hooks";
 import { getProducts, getStoreId, type BigCommerceProduct } from "@/utils/api";
+import { addToast } from "@heroui/toast";
 import { Search, X } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
@@ -10,12 +11,16 @@ interface ProductSearchDropdownProps {
   onSelectProduct: (product: BigCommerceProduct) => void;
   selectedProducts?: BigCommerceProduct[];
   type?: "product" | "collection";
+  disabled?: boolean;
+  disabledMessage?: string;
 }
 
 export default function ProductSearchDropdown({
   onSelectProduct,
   selectedProducts = [],
   type = "product",
+  disabled = false,
+  disabledMessage,
 }: ProductSearchDropdownProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [products, setProducts] = useState<BigCommerceProduct[]>([]);
@@ -129,26 +134,44 @@ export default function ProductSearchDropdown({
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
-      <div className="relative">
+      <div
+        className="relative"
+        onClick={() => {
+          if (disabled && disabledMessage) {
+            addToast({
+              title: "Limit Reached",
+              description: disabledMessage,
+              color: "warning",
+            });
+          }
+        }}
+      >
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => {
+            if (disabled) return;
             setSearchQuery(e.target.value);
             if (e.target.value.trim().length > 0) {
               setIsOpen(true);
             }
           }}
           onFocus={() => {
+            if (disabled) return;
             if (products.length > 0) {
               setIsOpen(true);
             }
           }}
           placeholder={`Search ${type === "product" ? "Products" : "Collections"}`}
-          className="w-full h-8 border border-[#8a8a8a] rounded-lg px-3 pl-9 text-[13px] leading-none focus:outline-none bg-[#fdfdfd] focus:border-blue-500"
+          readOnly={disabled}
+          className={`w-full h-8 border rounded-lg px-3 pl-9 text-[13px] leading-none focus:outline-none ${
+            disabled
+              ? "bg-gray-100 border-gray-300 cursor-not-allowed text-gray-400"
+              : "bg-[#fdfdfd] border-[#8a8a8a] focus:border-blue-500"
+          }`}
         />
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-        {searchQuery && (
+        <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${disabled ? "text-gray-300" : "text-gray-400"}`} />
+        {searchQuery && !disabled && (
           <button
             onClick={handleClearSearch}
             className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"

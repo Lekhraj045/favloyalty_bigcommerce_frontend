@@ -5,7 +5,8 @@ import { useAppSelector } from "@/store/hooks";
 import { getStorePlan, StorePlan } from "@/utils/api";
 import { Button } from "@heroui/button";
 import { Skeleton } from "@heroui/skeleton";
-import { usePathname } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 /** Hide channel dropdown on ways-to-redeem create/edit coupon pages (sub-routes or when a form is open on the list page). */
@@ -24,6 +25,7 @@ export default function SetupHeader({
   hideChannelSelector: hideChannelProp,
 }: SetupHeaderProps = {}) {
   const pathname = usePathname();
+  const router = useRouter();
   const hideByPath = shouldHideChannelSelector(pathname);
   const hideChannelSelector = hideChannelProp === true || hideByPath;
   const selectedChannel = useAppSelector(
@@ -47,6 +49,9 @@ export default function SetupHeader({
           plan: "free",
           trialDaysRemaining: null,
           paypalSubscriptionId: null,
+          limitReached: false,
+          orderCount: 0,
+          selectedOrderLimit: 0,
         });
       }
     };
@@ -54,13 +59,38 @@ export default function SetupHeader({
   }, []);
 
   return (
-    <div className="flex gap-2 justify-between items-center">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-bold">Setup FavLoyalty</h1>
-        <p>Configure how customers earn and use rewards.</p>
-      </div>
+    <div className="flex flex-col gap-4">
+      {/* Order Limit Warning Banner */}
+      {storePlan?.plan === "paid" && storePlan?.limitReached && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-yellow-800">
+                Order Limit Reached ({storePlan.orderCount?.toLocaleString()}/{storePlan.selectedOrderLimit?.toLocaleString()})
+              </p>
+              <p className="text-xs text-yellow-700">
+                Premium features are currently restricted. Upgrade your plan to continue using all Pro features.
+              </p>
+            </div>
+            <Button 
+              size="sm" 
+              className="custom-btn flex-shrink-0"
+              onClick={() => router.push('/pricing')}
+            >
+              Upgrade Now
+            </Button>
+          </div>
+        </div>
+      )}
 
-      <div className="flex gap-2.5 items-center">
+      <div className="flex gap-2 justify-between items-center">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-bold">Setup FavLoyalty</h1>
+          <p>Configure how customers earn and use rewards.</p>
+        </div>
+
+        <div className="flex gap-2.5 items-center">
         {!hideChannelSelector && <ChannelSelector />}
         <div className="relative">
           {!selectedChannel ? (
@@ -202,6 +232,7 @@ export default function SetupHeader({
         {storePlan?.plan === "free" && (
           <Button className="custom-btn">Upgrade</Button>
         )}
+      </div>
       </div>
     </div>
   );

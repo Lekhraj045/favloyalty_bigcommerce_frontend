@@ -60,6 +60,7 @@ export default function FreeProductForm({
   const [errors, setErrors] = useState<{
     expireCoupon?: string;
     products?: string;
+    customerTierSelection?: string;
   }>({});
 
   // Load coupon data when editing, or reset form when creating new
@@ -200,6 +201,17 @@ export default function FreeProductForm({
         newErrors.products = "All products must have valid points (1-999,999)";
       }
     });
+
+    // Validate customer tier selection when restriction is enabled
+    // customerRestrictionEnabled: true = disabled (no restriction), false = enabled (restriction ON)
+    if (!customerRestrictionEnabled) {
+      // Restriction is enabled, check if at least one tier is selected
+      const hasSelectedTier = selectedTiers.some((tier) => tier.status === true);
+      if (!hasSelectedTier) {
+        newErrors.customerTierSelection =
+          "Please select at least one customer tier or disable the customer restriction";
+      }
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -464,6 +476,8 @@ export default function FreeProductForm({
               isVisible: p.isVisible,
               type: p.type,
             }))}
+            disabled={selectedProducts.length >= 1}
+            disabledMessage="You can only add one product per free product coupon. To change the product, first delete the existing one, or create a new free product coupon."
           />
 
           {errors.products && (
@@ -514,6 +528,8 @@ export default function FreeProductForm({
         customerRestrictionEnabled={customerRestrictionEnabled}
         onTiersChange={setSelectedTiers}
         onRestrictionToggle={setCustomerRestrictionEnabled}
+        error={errors.customerTierSelection}
+        onErrorClear={() => setErrors((prev) => ({ ...prev, customerTierSelection: undefined }))}
       />
 
       <div className="flex items-center justify-end mt-4">

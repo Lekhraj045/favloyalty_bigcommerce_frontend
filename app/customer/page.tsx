@@ -19,7 +19,7 @@ export default function CustomersPage() {
       } catch (error) {
         console.error("Error loading store plan:", error);
         // Default to free plan if error
-        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null });
+        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null, limitReached: false, orderCount: 0, selectedOrderLimit: 0 });
       }
     };
     loadStorePlan();
@@ -37,8 +37,8 @@ export default function CustomersPage() {
 
             <div className="flex gap-2.5 items-center">
               <ChannelSelector />
-              {/* Only show Upgrade button for free plan users */}
-              {storePlan?.plan === "free" && (
+              {/* Only show Upgrade button for free plan users or when limit reached */}
+              {(storePlan?.plan === "free" || storePlan?.limitReached) && (
                 <Button className="custom-btn">Upgrade</Button>
               )}
             </div>

@@ -3,10 +3,14 @@
 import { useAppSelector } from "@/store/hooks";
 import {
   getCustomers,
+  getPoints,
   getPointsAwardedStats,
+  getPointsRedeemedStats,
   getStoreId,
   type Customer,
+  type PointData,
   type PointsAwardedStat,
+  type PointsRedeemedStat,
 } from "@/utils/api";
 import { Button } from "@heroui/button";
 import { DateRangePicker } from "@heroui/date-picker";
@@ -19,14 +23,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import CampaignTableArea from "./CampaignTable";
 
-interface TierCounts {
-  tierIndex0: number;
-  tierIndex1: number;
-  tierIndex2: number;
-  newTierIndex0: number;
-  newTierIndex1: number;
-  newTierIndex2: number;
-}
+// Dynamic tier counts: tierIndex -> { total, new }
+type TierCounts = Record<number, { total: number; new: number }>;
 
 // Calculate default date range: 15 days ago to today
 const getDefaultDateRange = (): { start: DateValue; end: DateValue } => {
@@ -53,20 +51,19 @@ export default function DashLayout() {
   }>(getDefaultDateRange());
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [newCustomers, setNewCustomers] = useState<Customer[]>([]);
-  const [tierCounts, setTierCounts] = useState<TierCounts>({
-    tierIndex0: 0,
-    tierIndex1: 0,
-    tierIndex2: 0,
-    newTierIndex0: 0,
-    newTierIndex1: 0,
-    newTierIndex2: 0,
-  });
+  const [tierCounts, setTierCounts] = useState<TierCounts>({});
+  const [pointsConfig, setPointsConfig] = useState<PointData | null>(null);
   const [loading, setLoading] = useState(false);
   const [pointsAwardedStats, setPointsAwardedStats] = useState<
     PointsAwardedStat[]
   >([]);
   const [totalPointsAwarded, setTotalPointsAwarded] = useState(0);
   const [pointsLoading, setPointsLoading] = useState(false);
+  const [pointsRedeemedStats, setPointsRedeemedStats] = useState<
+    PointsRedeemedStat[]
+  >([]);
+  const [totalPointsRedeemed, setTotalPointsRedeemed] = useState(0);
+  const [pointsRedeemedLoading, setPointsRedeemedLoading] = useState(false);
 
   const today = new Date();
   today.setHours(23, 59, 59, 999); // Set to end of today
@@ -83,14 +80,7 @@ export default function DashLayout() {
     if (!selectedChannel?.channel_id) {
       setCustomers([]);
       setNewCustomers([]);
-      setTierCounts({
-        tierIndex0: 0,
-        tierIndex1: 0,
-        tierIndex2: 0,
-        newTierIndex0: 0,
-        newTierIndex1: 0,
-        newTierIndex2: 0,
-      });
+      setTierCounts({});
       return;
     }
 
@@ -152,38 +142,21 @@ export default function DashLayout() {
 
       setNewCustomers(filteredNewCustomers);
 
-      // Calculate tier counts
-      const counts: TierCounts = {
-        tierIndex0: 0,
-        tierIndex1: 0,
-        tierIndex2: 0,
-        newTierIndex0: 0,
-        newTierIndex1: 0,
-        newTierIndex2: 0,
+      // Calculate tier counts (dynamic - supports any number of tiers)
+      const counts: TierCounts = {};
+
+      const addToCount = (tierIndex: number, isNew: boolean) => {
+        if (!counts[tierIndex]) counts[tierIndex] = { total: 0, new: 0 };
+        counts[tierIndex].total++;
+        if (isNew) counts[tierIndex].new++;
       };
 
-      // Count all customers by tier
       allCustomers.forEach((customer) => {
         const tierIndex = customer.currentTier?.tierIndex ?? 0;
-        if (tierIndex === 0) {
-          counts.tierIndex0++;
-        } else if (tierIndex === 1) {
-          counts.tierIndex1++;
-        } else if (tierIndex === 2) {
-          counts.tierIndex2++;
-        }
-      });
-
-      // Count new customers by tier
-      filteredNewCustomers.forEach((customer) => {
-        const tierIndex = customer.currentTier?.tierIndex ?? 0;
-        if (tierIndex === 0) {
-          counts.newTierIndex0++;
-        } else if (tierIndex === 1) {
-          counts.newTierIndex1++;
-        } else if (tierIndex === 2) {
-          counts.newTierIndex2++;
-        }
+        const isNew = filteredNewCustomers.some(
+          (c) => c.id === customer.id || c.bcCustomerId === customer.bcCustomerId,
+        );
+        addToCount(tierIndex, isNew);
       });
 
       setTierCounts(counts);
@@ -196,7 +169,7 @@ export default function DashLayout() {
 
   // Fetch points awarded statistics
   const fetchPointsAwardedStats = useCallback(async () => {
-    if (!selectedChannel?.channel_id || !dateRange.start || !dateRange.end) {
+    if (!selectedChannel?.id || !dateRange.start || !dateRange.end) {
       setPointsAwardedStats([]);
       setTotalPointsAwarded(0);
       return;
@@ -220,7 +193,7 @@ export default function DashLayout() {
 
       const response = await getPointsAwardedStats(
         storeId,
-        selectedChannel.channel_id,
+        selectedChannel.id,
         startDate.toISOString(),
         endDate.toISOString(),
       );
@@ -236,7 +209,7 @@ export default function DashLayout() {
     } finally {
       setPointsLoading(false);
     }
-  }, [selectedChannel?.channel_id, dateRange]);
+  }, [selectedChannel?.id, dateRange]);
 
   // Fetch customers when channel or date range changes
   useEffect(() => {
@@ -247,6 +220,67 @@ export default function DashLayout() {
   useEffect(() => {
     fetchPointsAwardedStats();
   }, [fetchPointsAwardedStats]);
+
+  // Fetch points redeemed statistics
+  const fetchPointsRedeemedStats = useCallback(async () => {
+    if (!selectedChannel?.id || !dateRange.start || !dateRange.end) {
+      setPointsRedeemedStats([]);
+      setTotalPointsRedeemed(0);
+      return;
+    }
+    setPointsRedeemedLoading(true);
+    try {
+      const storeId = getStoreId();
+      if (!storeId) return;
+      const startDate = dateRange.start.toDate
+        ? dateRange.start.toDate("UTC")
+        : new Date(dateRange.start.toString());
+      const endDate = dateRange.end.toDate
+        ? dateRange.end.toDate("UTC")
+        : new Date(dateRange.end.toString());
+      endDate.setHours(23, 59, 59, 999);
+      const response = await getPointsRedeemedStats(
+        storeId,
+        selectedChannel.id,
+        startDate.toISOString(),
+        endDate.toISOString(),
+      );
+      if (response.success && response.data) {
+        setPointsRedeemedStats(response.data.stats);
+        setTotalPointsRedeemed(response.data.totalPointsRedeemed);
+      }
+    } catch (error) {
+      console.error("Error fetching points redeemed stats:", error);
+      setPointsRedeemedStats([]);
+      setTotalPointsRedeemed(0);
+    } finally {
+      setPointsRedeemedLoading(false);
+    }
+  }, [selectedChannel?.id, dateRange]);
+
+  useEffect(() => {
+    fetchPointsRedeemedStats();
+  }, [fetchPointsRedeemedStats]);
+
+  // Fetch points config (tier names) when channel changes
+  const fetchPointsConfig = useCallback(async () => {
+    if (!selectedChannel?.id) {
+      setPointsConfig(null);
+      return;
+    }
+    const storeId = getStoreId();
+    if (!storeId) return;
+    try {
+      const data = await getPoints(storeId, selectedChannel.id);
+      setPointsConfig(data);
+    } catch {
+      setPointsConfig(null);
+    }
+  }, [selectedChannel?.id]);
+
+  useEffect(() => {
+    fetchPointsConfig();
+  }, [fetchPointsConfig]);
 
   const totalMembers = customers.length;
   const newMembers = newCustomers.length;
@@ -259,6 +293,15 @@ export default function DashLayout() {
       pointsAwardedStats.find(
         (stat) => stat.transactionName === transactionName,
       ) || null
+    );
+  };
+
+  const getStatForRedeemed = (
+    transactionName: string,
+  ): PointsRedeemedStat | null => {
+    return (
+      pointsRedeemedStats.find((s) => s.transactionName === transactionName) ??
+      null
     );
   };
 
@@ -372,88 +415,48 @@ export default function DashLayout() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
-                      {/* Bronze Tier (tierIndex 0) */}
-                      <div className="card">
-                        <div className="flex flex-col gap-2">
-                          <span className="text-sm font-bold text-[#303030]">
-                            Bronze
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">
-                              {loading ? "..." : tierCounts.tierIndex0}
-                            </span>
-                            {tierCounts.newTierIndex0 > 0 ? (
-                              <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
-                                <span>{tierCounts.newTierIndex0}</span>
-                                <span>
-                                  <ArrowUp
-                                    strokeWidth={3}
-                                    className="w-3 h-3 text-white"
-                                  />
+                    {pointsConfig?.tierStatus && (pointsConfig.tier?.length ?? 0) > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {pointsConfig.tier!.map((tier, tierIndex) => {
+                        const count = tierCounts[tierIndex] ?? {
+                          total: 0,
+                          new: 0,
+                        };
+                        return (
+                          <div key={tier._id ?? tierIndex} className="card">
+                            <div className="flex flex-col gap-2">
+                              <span className="text-sm font-bold text-[#303030]">
+                                {tier.tierName}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xl font-bold text-[#303030]">
+                                  {loading ? "..." : count.total}
                                 </span>
+                                {count.new > 0 ? (
+                                  <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
+                                    <span>{count.new}</span>
+                                    <span>
+                                      <ArrowUp
+                                        strokeWidth={3}
+                                        className="w-3 h-3 text-white"
+                                      />
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                                )}
                               </div>
-                            ) : (
-                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
-                            )}
+                            </div>
                           </div>
-                        </div>
-                      </div>
-
-                      {/* Silver Tier (tierIndex 1) */}
-                      <div className="card">
-                        <div className="flex flex-col gap-2">
-                          <span className="text-sm font-bold text-[#303030]">
-                            Silver
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">
-                              {loading ? "..." : tierCounts.tierIndex1}
-                            </span>
-                            {tierCounts.newTierIndex1 > 0 ? (
-                              <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
-                                <span>{tierCounts.newTierIndex1}</span>
-                                <span>
-                                  <ArrowUp
-                                    strokeWidth={3}
-                                    className="w-3 h-3 text-white"
-                                  />
-                                </span>
-                              </div>
-                            ) : (
-                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Gold Tier (tierIndex 2) */}
-                      <div className="card">
-                        <div className="flex flex-col gap-2">
-                          <span className="text-sm font-bold text-[#303030]">
-                            Gold
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-[#303030]">
-                              {loading ? "..." : tierCounts.tierIndex2}
-                            </span>
-                            {tierCounts.newTierIndex2 > 0 ? (
-                              <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
-                                <span>{tierCounts.newTierIndex2}</span>
-                                <span>
-                                  <ArrowUp
-                                    strokeWidth={3}
-                                    className="w-3 h-3 text-white"
-                                  />
-                                </span>
-                              </div>
-                            ) : (
-                              <MoveHorizontal className="w-4 h-4 text-[#303030]" />
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                        );
+                      })}
                     </div>
+                  ) : (
+                    <p className="text-sm text-[#666]">
+                      Tier system is disabled. Enable tiers in Points & Tier
+                      System to see tier breakdown.
+                    </p>
+                  )}
                   </div>
 
                   {/* Points Awarded Section */}
@@ -783,11 +786,17 @@ export default function DashLayout() {
                           Points Redeemed:
                         </span>
                         <span className="text-base font-bold text-[#219653]">
-                          0
+                          {pointsRedeemedLoading
+                            ? "..."
+                            : totalPointsRedeemed.toLocaleString()}
                         </span>
                       </div>
                       <div className="text-sm text-[#303030]">
-                        <span className="font-bold">0 = Rs. 0.00</span>
+                        <span className="font-bold">
+                          {pointsRedeemedLoading
+                            ? "..."
+                            : `${totalPointsRedeemed.toLocaleString()} = Rs. ${pointsToCurrency(totalPointsRedeemed).toFixed(2)}`}
+                        </span>
                       </div>
                     </div>
 
@@ -808,9 +817,29 @@ export default function DashLayout() {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xl font-bold text-[#303030]">
-                              0
+                              {pointsRedeemedLoading
+                                ? "..."
+                                : (
+                                    getStatForRedeemed(
+                                      "Percentage Discount",
+                                    )?.totalPointsRedeemed ?? 0
+                                  ).toLocaleString()}
                             </span>
-                            <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            {!pointsRedeemedLoading &&
+                              getStatForRedeemed(
+                                "Percentage Discount",
+                              ) &&
+                              renderGrowthIndicator(
+                                getStatForRedeemed(
+                                  "Percentage Discount",
+                                )!.growth,
+                              )}
+                            {!pointsRedeemedLoading &&
+                              !getStatForRedeemed(
+                                "Percentage Discount",
+                              ) && (
+                                <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                              )}
                           </div>
                         </div>
                       </div>
@@ -831,9 +860,22 @@ export default function DashLayout() {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xl font-bold text-[#303030]">
-                              0
+                              {pointsRedeemedLoading
+                                ? "..."
+                                : (
+                                    getStatForRedeemed("Fixed Discount")
+                                      ?.totalPointsRedeemed ?? 0
+                                  ).toLocaleString()}
                             </span>
-                            <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            {!pointsRedeemedLoading &&
+                              getStatForRedeemed("Fixed Discount") &&
+                              renderGrowthIndicator(
+                                getStatForRedeemed("Fixed Discount")!.growth,
+                              )}
+                            {!pointsRedeemedLoading &&
+                              !getStatForRedeemed("Fixed Discount") && (
+                                <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                              )}
                           </div>
                         </div>
                       </div>
@@ -854,9 +896,22 @@ export default function DashLayout() {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xl font-bold text-[#303030]">
-                              0
+                              {pointsRedeemedLoading
+                                ? "..."
+                                : (
+                                    getStatForRedeemed("Free Shipping")
+                                      ?.totalPointsRedeemed ?? 0
+                                  ).toLocaleString()}
                             </span>
-                            <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            {!pointsRedeemedLoading &&
+                              getStatForRedeemed("Free Shipping") &&
+                              renderGrowthIndicator(
+                                getStatForRedeemed("Free Shipping")!.growth,
+                              )}
+                            {!pointsRedeemedLoading &&
+                              !getStatForRedeemed("Free Shipping") && (
+                                <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                              )}
                           </div>
                         </div>
                       </div>
@@ -877,9 +932,22 @@ export default function DashLayout() {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xl font-bold text-[#303030]">
-                              0
+                              {pointsRedeemedLoading
+                                ? "..."
+                                : (
+                                    getStatForRedeemed("Free Product")
+                                      ?.totalPointsRedeemed ?? 0
+                                  ).toLocaleString()}
                             </span>
-                            <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                            {!pointsRedeemedLoading &&
+                              getStatForRedeemed("Free Product") &&
+                              renderGrowthIndicator(
+                                getStatForRedeemed("Free Product")!.growth,
+                              )}
+                            {!pointsRedeemedLoading &&
+                              !getStatForRedeemed("Free Product") && (
+                                <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                              )}
                           </div>
                         </div>
                       </div>

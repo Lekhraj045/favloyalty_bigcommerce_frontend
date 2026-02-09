@@ -74,6 +74,9 @@ function CustomerDetailsContent() {
           plan: "free",
           trialDaysRemaining: null,
           paypalSubscriptionId: null,
+          limitReached: false,
+          orderCount: 0,
+          selectedOrderLimit: 0,
         });
       }
     };
@@ -312,8 +315,8 @@ function CustomerDetailsContent() {
             </div>
 
             <div className="flex gap-2.5 items-center">
-              {/* Only show Upgrade button for free plan users */}
-              {storePlan?.plan === "free" && (
+              {/* Only show Upgrade button for free plan users or when limit reached */}
+              {(storePlan?.plan === "free" || storePlan?.limitReached) && (
                 <Button className="custom-btn">Upgrade</Button>
               )}
             </div>
@@ -344,7 +347,8 @@ function CustomerDetailsContent() {
                       {customer.profile?.contactNo || "No contact number"}
                     </div>
                     <div className="flex gap-2 items-center">
-                      <VenusAndMars size={14} /> Gender: N/A
+                      <VenusAndMars size={14} /> Gender:{" "}
+                      {customer.profile?.gender || "N/A"}
                     </div>
                     <div className="flex gap-2 items-center">
                       <Users size={14} /> Age Group:{" "}
@@ -352,8 +356,10 @@ function CustomerDetailsContent() {
                     </div>
                     <div className="flex gap-2 items-center">
                       <Calendar size={14} /> DOB:{" "}
-                      {customer.profile?.dateOfBirth
-                        ? formatDateShort(customer.profile.dateOfBirth)
+                      {customer.dob || customer.profile?.dateOfBirth
+                        ? formatDateShort(
+                            customer.dob || customer.profile?.dateOfBirth,
+                          )
                         : "N/A"}
                     </div>
                     <div className="flex gap-2 items-center">
@@ -393,8 +399,14 @@ function CustomerDetailsContent() {
                       <div className="flex flex-col gap-1">
                         <p>Successful Referrals</p>
                         <h2 className="text-lg font-bold">
-                          {customer.refferalCount || 0}
+                          {(customer.referral_points ?? 0).toLocaleString()}
                         </h2>
+                        {(customer.refferalCount ?? 0) > 0 && (
+                          <p className="text-xs text-[#616161]">
+                            from {customer.refferalCount} referral
+                            {(customer.refferalCount ?? 0) !== 1 ? "s" : ""}
+                          </p>
+                        )}
                       </div>
                       <Button
                         className="custom-btn"
@@ -482,6 +494,7 @@ function CustomerDetailsContent() {
       <SuccessfulReferralsModal
         isOpen={isSuccessfulReferralsModalOpen}
         onClose={() => setIsSuccessfulReferralsModalOpen(false)}
+        customerId={customer.id}
       />
     </>
   );

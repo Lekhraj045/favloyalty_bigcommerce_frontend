@@ -2,13 +2,17 @@
 
 import ChannelSelector from "@/components/ChannelSelector";
 import { useAppSelector } from "@/store/hooks";
-import { updateChannelWidgetVisibility } from "@/store/slices/channelSlice";
-import { updateWidgetVisibilityApi } from "@/utils/api";
+import {
+  updateChannelAfterReset,
+  updateChannelWidgetVisibility,
+} from "@/store/slices/channelSlice";
+import { resetChannelSettingsApi, updateWidgetVisibilityApi } from "@/utils/api";
 import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
 import { useState } from "react";
 import { useDispatch } from "react-redux";
 import DashLayout from "./components/dash-layout";
+import ResetSettingsModal from "./components/ResetSettingsModal";
 import SetupBar from "./components/setup-bar";
 import WhyWidgetDisable from "./components/why-widget-disbale";
 
@@ -19,6 +23,8 @@ export default function DashboardPage() {
   );
 
   const [widgetToggleLoading, setWidgetToggleLoading] = useState(false);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   // Show the card when setupprogress is null, undefined, or less than 4
   const shouldShowWidgetDisabledCard =
@@ -76,6 +82,52 @@ export default function DashboardPage() {
     }
   };
 
+  const handleResetSettings = async () => {
+    if (!selectedChannel?.id) {
+      addToast({
+        title: "No channel selected",
+        description: "Please select a channel to reset settings.",
+        color: "warning",
+      });
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const result = await resetChannelSettingsApi(selectedChannel.id);
+      if (result.success && result.data) {
+        dispatch(
+          updateChannelAfterReset({
+            channelId: result.data.channelId,
+            setupprogress: result.data.setupprogress,
+            pointsTierSystemCompleted: result.data.pointsTierSystemCompleted,
+            waysToEarnCompleted: result.data.waysToEarnCompleted,
+            waysToRedeemCompleted: result.data.waysToRedeemCompleted,
+            customiseWidgetCompleted: result.data.customiseWidgetCompleted,
+            widget_visibility: result.data.widget_visibility,
+          }),
+        );
+        setResetModalOpen(false);
+        addToast({
+          title: "Settings reset successfully",
+          description:
+            "All loyalty program settings have been reset to their default values for this channel.",
+          color: "success",
+        });
+      }
+    } catch (error: any) {
+      console.error("Failed to reset settings:", error);
+      addToast({
+        title: "Reset failed",
+        description:
+          error?.message || "An error occurred while resetting settings.",
+        color: "danger",
+      });
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   return (
     <>
       <div className="max-w-5xl mx-auto">
@@ -102,7 +154,13 @@ export default function DashboardPage() {
               >
                 {isWidgetEnabled ? "Disable Widget" : "Enable Widget"}
               </Button>
-              <Button className="custom-btn danger-btn">Reset Settings</Button>
+              <Button
+                className="custom-btn danger-btn"
+                onPress={() => setResetModalOpen(true)}
+                isDisabled={!selectedChannel?.id}
+              >
+                Reset Settings
+              </Button>
             </div>
           </div>
 
@@ -111,6 +169,13 @@ export default function DashboardPage() {
           <SetupBar />
 
           <DashLayout />
+
+          <ResetSettingsModal
+            isOpen={resetModalOpen}
+            onClose={() => !resetLoading && setResetModalOpen(false)}
+            onConfirm={handleResetSettings}
+            isLoading={resetLoading}
+          />
         </div>
       </div>
     </>

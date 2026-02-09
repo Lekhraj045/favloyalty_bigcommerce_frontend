@@ -47,7 +47,7 @@ export default function PointsSetting() {
   const [selectedPointNameOption, setSelectedPointNameOption] =
     useState<string>("Points");
   const [customPointNames, setCustomPointNames] = useState<CustomPointName[]>(
-    []
+    [],
   );
   const [selectedLogo, setSelectedLogo] = useState<number | null>(0);
   const [customLogo, setCustomLogo] = useState<File | null>(null);
@@ -71,20 +71,22 @@ export default function PointsSetting() {
   const [saveLoading, setSaveLoading] = useState<boolean>(false);
   const [saveAndNextLoading, setSaveAndNextLoading] = useState<boolean>(false);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
-    {}
+    {},
   );
   const [showCustomNameModal, setShowCustomNameModal] =
     useState<boolean>(false);
   const [resetTierEditing, setResetTierEditing] = useState<boolean>(false);
-  
+  const [tierValidationErrors, setTierValidationErrors] = useState<Record<number, { pointRequired?: string; multiplier?: string }>>({});
+
   // Plan and upgrade modal state
   const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
-  const [restrictedFeatureName, setRestrictedFeatureName] = useState<string>("");
+  const [restrictedFeatureName, setRestrictedFeatureName] =
+    useState<string>("");
 
   // Get selected channel from Redux store
   const selectedChannel = useAppSelector(
-    (state) => state.channel.selectedChannel
+    (state) => state.channel.selectedChannel,
   );
   const dispatch = useAppDispatch();
   const storeId = getStoreId();
@@ -139,9 +141,9 @@ export default function PointsSetting() {
     setValidationErrors({});
   }, []);
 
-  // Helper function to check if user is on free plan
+  // Helper function to check if user is on free plan or order limit reached
   const isFreePlan = () => {
-    return storePlan?.plan === "free";
+    return storePlan?.plan === "free" || storePlan?.limitReached === true;
   };
 
   // Helper function to show upgrade modal
@@ -170,22 +172,30 @@ export default function PointsSetting() {
         } catch (error) {
           console.error("Error loading store plan:", error);
           // Default to free plan if error
-          plan = { plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null };
+          plan = {
+            plan: "free",
+            trialDaysRemaining: null,
+            paypalSubscriptionId: null,
+            limitReached: false,
+            orderCount: 0,
+            selectedOrderLimit: 0,
+          };
         }
 
         if (!isMounted) return;
 
         setStorePlan(plan);
-        
-        // If free plan, ensure expiry and tiers are turned off
-        if (plan.plan === "free") {
+
+        // If free plan or limit reached, ensure expiry and tiers are turned off
+        const isRestricted = plan.plan === "free" || plan.limitReached === true;
+        if (isRestricted) {
           setExpiry(false);
           setTierStatus(false);
         }
 
         // Now load points data
         const data = await getPoints(storeId, channelId);
-        
+
         if (!isMounted) return;
 
         if (data) {
@@ -194,8 +204,8 @@ export default function PointsSetting() {
           setPointId(data._id || data.pointName);
           setPointName(data.pointName);
           setSelectedPointNameOption(data.pointName);
-          // If free plan, ensure expiry and tiers are off regardless of saved data
-          const isFree = plan.plan === "free";
+          // If free plan or limit reached, ensure expiry and tiers are off regardless of saved data
+          const isFree = plan.plan === "free" || plan.limitReached === true;
           setExpiry(isFree ? false : data.expiry);
           setExpiriesInDays(data.expiriesInDays || 1);
           setTierStatus(isFree ? false : data.tierStatus);
@@ -212,13 +222,13 @@ export default function PointsSetting() {
               tierStatus: data.tierStatus,
               tiers: data.tierStatus ? tiersToSet : [],
               channelId: channelId,
-            })
+            }),
           );
           if (data.logo) {
             setLogoDetails(data.logo);
             // Find logo index
             const logoIndex = logos.findIndex(
-              (logo) => logo === data.logo?.name
+              (logo) => logo === data.logo?.name,
             );
             if (logoIndex !== -1) {
               // Predefined logo found
@@ -248,7 +258,7 @@ export default function PointsSetting() {
         } else {
           // No data found - reset to default values
           console.log(
-            "ℹ️ No points data found for this channel - resetting to defaults"
+            "ℹ️ No points data found for this channel - resetting to defaults",
           );
           resetFormToDefaults();
           // Clear Redux store for this channel
@@ -257,19 +267,19 @@ export default function PointsSetting() {
               tierStatus: false,
               tiers: [],
               channelId: channelId,
-            })
+            }),
           );
         }
       } catch (error: any) {
         if (!isMounted) return;
-        
+
         // If 404 or not found, reset to defaults
         if (
           error?.message?.includes("404") ||
           error?.message?.includes("not found")
         ) {
           console.log(
-            "ℹ️ No points configuration found - resetting to defaults"
+            "ℹ️ No points configuration found - resetting to defaults",
           );
           resetFormToDefaults();
         } else {
@@ -311,13 +321,13 @@ export default function PointsSetting() {
 
     if (tierStatus) {
       const hasEmptyTierName = tiers.some(
-        (tier) => !tier.tierName || tier.tierName.trim() === ""
+        (tier) => !tier.tierName || tier.tierName.trim() === "",
       );
       const hasEmptyPointRequired = tiers.some(
-        (tier) => tier.pointRequired === undefined || tier.pointRequired < 0
+        (tier) => tier.pointRequired === undefined || tier.pointRequired < 0,
       );
       const hasEmptyMultiplier = tiers.some(
-        (tier) => tier.multiplier === undefined || tier.multiplier <= 0
+        (tier) => tier.multiplier === undefined || tier.multiplier <= 0,
       );
 
       if (hasEmptyTierName) {
@@ -328,6 +338,24 @@ export default function PointsSetting() {
       }
       if (hasEmptyMultiplier) {
         errors.multiplier = "All multipliers are required";
+      }
+
+      // Validate progressive tier values
+      for (let i = 1; i < tiers.length; i++) {
+        const currentTier = tiers[i];
+        const prevTier = tiers[i - 1];
+        
+        // Check Points Required progression
+        if (currentTier.pointRequired <= prevTier.pointRequired) {
+          errors.pointRequired = `Tier ${i + 1} points must be greater than Tier ${i} points`;
+        }
+        
+        // Check Multiplier progression
+        const currentMultiplier = currentTier.multiplier || 1;
+        const prevMultiplier = prevTier.multiplier || 1;
+        if (currentMultiplier <= prevMultiplier) {
+          errors.multiplier = `Tier ${i + 1} multiplier must be greater than Tier ${i} multiplier`;
+        }
       }
     }
 
@@ -409,7 +437,7 @@ export default function PointsSetting() {
       showUpgradeModalForFeature("Custom Point Logo");
       return;
     }
-    
+
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/svg+xml";
@@ -486,7 +514,7 @@ export default function PointsSetting() {
           tierStatus: false,
           tiers: [],
           channelId: channelId,
-        })
+        }),
       );
     }
   };
@@ -538,7 +566,7 @@ export default function PointsSetting() {
 
         // Show error toast with list of missing fields
         const errorMessages = Object.values(validationResult.errors).filter(
-          Boolean
+          Boolean,
         );
         const errorMessage =
           errorMessages.length > 0
@@ -575,7 +603,7 @@ export default function PointsSetting() {
           channelId: currentChannelId,
         });
         alert(
-          `Store ID and Channel ID are required. Please select a channel.\nStore ID: ${currentStoreId || "missing"}\nChannel ID: ${currentChannelId || "missing"}`
+          `Store ID and Channel ID are required. Please select a channel.\nStore ID: ${currentStoreId || "missing"}\nChannel ID: ${currentChannelId || "missing"}`,
         );
         return;
       }
@@ -602,7 +630,7 @@ export default function PointsSetting() {
           response = await updatePoints(
             pointId,
             pointData,
-            customLogo || undefined
+            customLogo || undefined,
           );
         } else {
           console.log("📤 Calling savePoints API with:", {
@@ -614,7 +642,7 @@ export default function PointsSetting() {
             currentStoreId,
             currentChannelId,
             pointData,
-            customLogo || undefined
+            customLogo || undefined,
           );
           if (response.data?._id) {
             setPointId(response.data._id);
@@ -643,7 +671,7 @@ export default function PointsSetting() {
             await updatePageCompletionStatus(
               currentChannelId,
               "pointsTierSystem",
-              isPageCompleted
+              isPageCompleted,
             );
             // Update Redux store to reflect the new completion status
             dispatch(
@@ -651,7 +679,7 @@ export default function PointsSetting() {
                 channelId: currentChannelId,
                 pageType: "pointsTierSystem",
                 completed: isPageCompleted,
-              })
+              }),
             );
           } catch (error) {
             console.error("Error updating page completion status:", error);
@@ -665,7 +693,7 @@ export default function PointsSetting() {
             tierStatus: tierStatus,
             tiers: tierStatus ? tiers : [],
             channelId: currentChannelId,
-          })
+          }),
         );
 
         // Reset tier editing state after successful save
@@ -674,7 +702,7 @@ export default function PointsSetting() {
 
         // Stop loading first, then show success toast
         setLoadingState(false);
-        
+
         // Show success toast after loading state is cleared
         addToast({
           title: "Saved Successfully",
@@ -703,7 +731,7 @@ export default function PointsSetting() {
       isEditMode,
       pointId,
       dispatch,
-    ]
+    ],
   );
 
   // Save function
@@ -886,7 +914,9 @@ export default function PointsSetting() {
                         alt="Point Logo"
                         width={25}
                         height={25}
-                        style={isRestricted ? { filter: "grayscale(100%)" } : {}}
+                        style={
+                          isRestricted ? { filter: "grayscale(100%)" } : {}
+                        }
                       />
                       {/* Show crown icon on premium logos (index >= 3) only for free users */}
                       {isPremium && isFreePlan() && (
@@ -1090,6 +1120,7 @@ export default function PointsSetting() {
               onTierUpdate={handleTierUpdate}
               validationErrors={validationErrors}
               resetEditing={resetTierEditing}
+              onTierValidationError={setTierValidationErrors}
             />
           </div>
         )}

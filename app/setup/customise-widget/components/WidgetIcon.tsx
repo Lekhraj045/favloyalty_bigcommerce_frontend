@@ -17,9 +17,9 @@ export default function WidgetIconArea() {
   const [showUpgradeModal, setShowUpgradeModal] = React.useState<boolean>(false);
   const hasDisabledRestrictedOptionsRef = useRef<boolean>(false);
 
-  // Helper function to check if user is on free plan
+  // Helper function to check if user is on free plan or order limit reached
   const isFreePlan = () => {
-    return storePlan?.plan === "free";
+    return storePlan?.plan === "free" || storePlan?.limitReached === true;
   };
 
   // Load store plan information
@@ -31,17 +31,17 @@ export default function WidgetIconArea() {
       } catch (error) {
         console.error("Error loading store plan:", error);
         // Default to free plan if error
-        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null });
+        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null, limitReached: false, orderCount: 0, selectedOrderLimit: 0 });
       }
     };
     loadStorePlan();
   }, []);
 
-  // Disable restricted options for free users if they're selected
+  // Disable restricted options for free users or when limit reached if they're selected
   useEffect(() => {
     if (
       storePlan &&
-      storePlan.plan === "free" &&
+      (storePlan.plan === "free" || storePlan.limitReached === true) &&
       !hasDisabledRestrictedOptionsRef.current
     ) {
       // Disable restricted launcher options

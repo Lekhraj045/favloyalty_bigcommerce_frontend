@@ -107,6 +107,44 @@ const channelSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    updateChannelAfterReset: (
+      state,
+      action: PayloadAction<{
+        channelId: string;
+        setupprogress: number;
+        pointsTierSystemCompleted: boolean;
+        waysToEarnCompleted: boolean;
+        waysToRedeemCompleted: boolean;
+        customiseWidgetCompleted: boolean;
+        widget_visibility: boolean;
+      }>,
+    ) => {
+      const { channelId, ...resetData } = action.payload;
+      const channelIndex = state.channels.findIndex(
+        (ch) => ch.id === channelId,
+      );
+      if (channelIndex !== -1) {
+        state.channels[channelIndex] = {
+          ...state.channels[channelIndex],
+          ...resetData,
+        };
+      }
+      if (state.selectedChannel?.id === channelId) {
+        state.selectedChannel = {
+          ...state.selectedChannel,
+          ...resetData,
+        };
+        if (typeof window !== "undefined") {
+          localStorage.setItem(
+            "redux_selected_channel",
+            JSON.stringify(state.selectedChannel),
+          );
+        }
+      }
+      if (typeof window !== "undefined") {
+        localStorage.setItem("bc_channels", JSON.stringify(state.channels));
+      }
+    },
     updateChannelCompletionStatus: (
       state,
       action: PayloadAction<{
@@ -213,6 +251,7 @@ export const {
   setLoading,
   setError,
   clearError,
+  updateChannelAfterReset,
   updateChannelCompletionStatus,
 } = channelSlice.actions;
 

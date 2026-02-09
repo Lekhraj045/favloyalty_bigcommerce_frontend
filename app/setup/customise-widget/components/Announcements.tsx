@@ -8,9 +8,9 @@ export default function AnnouncementsArea() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
 
-  // Helper function to check if user is on free plan
+  // Helper function to check if user is on free plan or order limit reached
   const isFreePlan = () => {
-    return storePlan?.plan === "free";
+    return storePlan?.plan === "free" || storePlan?.limitReached === true;
   };
 
   // Load store plan information
@@ -22,7 +22,7 @@ export default function AnnouncementsArea() {
       } catch (error) {
         console.error("Error loading store plan:", error);
         // Default to free plan if error
-        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null });
+        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null, limitReached: false, orderCount: 0, selectedOrderLimit: 0 });
       }
     };
     loadStorePlan();

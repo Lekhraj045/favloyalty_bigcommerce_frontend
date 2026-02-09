@@ -13,11 +13,13 @@ import CustomerReferralTableArea from "./CustomerReferralTable";
 interface SuccessfulReferralsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  customerId: string;
 }
 
 export default function SuccessfulReferralsModal({
   isOpen,
   onClose,
+  customerId,
 }: SuccessfulReferralsModalProps) {
   return (
     <Modal
@@ -39,7 +41,7 @@ export default function SuccessfulReferralsModal({
               <h2 className="text-sm font-bold">Customer Referral Details</h2>
             </ModalHeader>
             <ModalBody>
-              <CustomerReferralTableArea />
+              <CustomerReferralTableArea customerId={customerId} />
             </ModalBody>
             <ModalFooter>
               <Button className="custom-btn-default" onPress={onClose}>

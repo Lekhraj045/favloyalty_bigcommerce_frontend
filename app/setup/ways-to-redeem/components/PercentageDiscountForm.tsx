@@ -177,6 +177,8 @@ export default function PercentageDiscountForm({
     pointValue?: string;
     discountAmount?: string;
     expireCoupon?: string;
+    productSelection?: string;
+    customerTierSelection?: string;
   }>({});
 
   // Handler to prevent decimal input and enforce max values
@@ -278,6 +280,32 @@ export default function PercentageDiscountForm({
       if (isNaN(expireNum) || expireNum < 1 || expireNum > 365) {
         newErrors.expireCoupon =
           "Expiry days must be between 1 and 365 (whole numbers only)";
+      }
+    }
+
+    // Validate product/collection selection when restriction is enabled
+    if (!allowCouponForProduct) {
+      // Restriction is enabled, check if at least one product or collection is selected
+      if (currentRestrictionType === "product" && selectedItems.length === 0) {
+        newErrors.productSelection =
+          "Please select at least one product or disable the product restriction";
+      } else if (
+        currentRestrictionType === "collection" &&
+        selectedCollections.length === 0
+      ) {
+        newErrors.productSelection =
+          "Please select at least one collection or disable the product restriction";
+      }
+    }
+
+    // Validate customer tier selection when restriction is enabled
+    // customerRestrictionEnabled: true = disabled (no restriction), false = enabled (restriction ON)
+    if (!customerRestrictionEnabled) {
+      // Restriction is enabled, check if at least one tier is selected
+      const hasSelectedTier = selectedTiers.some((tier) => tier.status === true);
+      if (!hasSelectedTier) {
+        newErrors.customerTierSelection =
+          "Please select at least one customer tier or disable the customer restriction";
       }
     }
 
@@ -591,17 +619,30 @@ export default function PercentageDiscountForm({
       </div>
 
       {/* Bottom Section: Product Selection */}
-      <div className="card !p-0">
+      <div className={`card !p-0 ${errors.productSelection ? "border border-red-500" : ""}`}>
         <div className="flex justify-between items-center gap-6 p-4 border-b border-[#DEDEDE]">
-          <span className="text-base font-bold">
-            Allow discount for selected products
-          </span>
+          <div className="flex flex-col">
+            <span className="text-base font-bold">
+              Allow discount for selected products
+            </span>
+            {errors.productSelection && (
+              <span className="text-xs text-red-500 mt-1">
+                {errors.productSelection}
+              </span>
+            )}
+          </div>
           <Switch
             aria-label="Allow discount for selected products"
             size="sm"
             color="success"
             isSelected={!allowCouponForProduct}
-            onValueChange={(value) => setAllowCouponForProduct(!value)}
+            onValueChange={(value) => {
+              setAllowCouponForProduct(!value);
+              // Clear the error when toggling
+              if (errors.productSelection) {
+                setErrors((prev) => ({ ...prev, productSelection: undefined }));
+              }
+            }}
           />
         </div>
 
@@ -649,6 +690,10 @@ export default function PercentageDiscountForm({
                         productId: product.id.toString(),
                       };
                       setSelectedItems([...selectedItems, newItem]);
+                      // Clear product selection error when a product is added
+                      if (errors.productSelection) {
+                        setErrors((prev) => ({ ...prev, productSelection: undefined }));
+                      }
                     }}
                     selectedProducts={selectedItems.map((item) => ({
                       id: parseInt(item.ids || "0"),
@@ -676,6 +721,10 @@ export default function PercentageDiscountForm({
                         pointRequired: "0",
                       };
                       setSelectedCollections([...selectedCollections, newItem]);
+                      // Clear product selection error when a collection is added
+                      if (errors.productSelection) {
+                        setErrors((prev) => ({ ...prev, productSelection: undefined }));
+                      }
                     }}
                     selectedProducts={selectedCollections.map((item) => ({
                       id: parseInt(item.ids || "0"),
@@ -731,6 +780,8 @@ export default function PercentageDiscountForm({
         customerRestrictionEnabled={customerRestrictionEnabled}
         onTiersChange={setSelectedTiers}
         onRestrictionToggle={setCustomerRestrictionEnabled}
+        error={errors.customerTierSelection}
+        onErrorClear={() => setErrors((prev) => ({ ...prev, customerTierSelection: undefined }))}
       />
 
       <div className="flex items-center justify-end mt-4">

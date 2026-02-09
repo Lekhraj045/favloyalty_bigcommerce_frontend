@@ -1,16 +1,34 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PlanSliderArea from "./components/PlanSlider";
 import PricingPlanArea from "./components/PricingPlan";
 import { Button } from '@heroui/button';
 import PricingFaqsArea from './components/PricingFaqs';
+import { getStorePlan, StorePlan } from '@/utils/api';
 
 export default function PricingPage() {
   const [orderValue, setOrderValue] = useState<number>(750);
+  const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
   const minValue = 750;
   const basePrice = 20.00;
   const pricePer50Orders = 1.00;
+
+  // Fetch store plan function (reusable)
+  const fetchStorePlan = useCallback(async () => {
+    try {
+      const planData = await getStorePlan();
+      setStorePlan(planData);
+    } catch (err) {
+      console.error('Error fetching store plan:', err);
+      setStorePlan({ plan: 'free', trialDaysRemaining: null, paypalSubscriptionId: null, limitReached: false, orderCount: 0, selectedOrderLimit: 0 });
+    }
+  }, []);
+
+  // Fetch store plan on mount
+  useEffect(() => {
+    fetchStorePlan();
+  }, [fetchStorePlan]);
 
   // Calculate monthly price based on orders
   const calculatePrice = (orders: number) => {
@@ -25,6 +43,11 @@ export default function PricingPage() {
     setOrderValue(value);
   };
 
+  // Callback to refresh store plan after plan change
+  const handlePlanChange = useCallback(() => {
+    fetchStorePlan();
+  }, [fetchStorePlan]);
+
   return (
     <>
       <div className="max-w-5xl mx-auto">
@@ -37,9 +60,9 @@ export default function PricingPage() {
           </div>
 
           <div className="flex flex-col gap-4">
-            <PlanSliderArea value={orderValue} onChange={handleOrderChange} />
+            <PlanSliderArea value={orderValue} onChange={handleOrderChange} storePlan={storePlan} />
 
-            <PricingPlanArea orderCount={orderValue} price={monthlyPrice} />
+            <PricingPlanArea orderCount={orderValue} price={monthlyPrice} onPlanChange={handlePlanChange} />
 
             {/* Enterprise Solutions Section */}
             <div className="bg-[#2d2d2d] rounded-2xl p-8 flex flex-col items-center gap-4 text-center">

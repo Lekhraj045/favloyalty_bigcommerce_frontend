@@ -1,8 +1,35 @@
 "use client";
 
+import { useAppSelector } from "@/store/hooks";
 import { Accordion, AccordionItem } from "@heroui/accordion";
 import Image from "next/image";
+
+// Map of completion flags to their corresponding messages
+const DISABLED_REASONS_MAP: {
+  key: "pointsTierSystemCompleted" | "waysToEarnCompleted" | "waysToRedeemCompleted" | "customiseWidgetCompleted";
+  message: string;
+}[] = [
+  { key: "pointsTierSystemCompleted", message: "Point Setting is not yet setup" },
+  { key: "waysToEarnCompleted", message: "Earn Setting is disabled or not yet setup" },
+  { key: "waysToRedeemCompleted", message: "Redeem Setting is disabled or not yet setup" },
+  { key: "customiseWidgetCompleted", message: "Design Setting is not yet setup" },
+];
+
 export default function WhyWidgetDisable() {
+  const selectedChannel = useAppSelector(
+    (state) => state.channel.selectedChannel,
+  );
+
+  // Filter to only show reasons for incomplete settings
+  const incompleteReasons = DISABLED_REASONS_MAP.filter(
+    (reason) => !selectedChannel?.[reason.key]
+  );
+
+  // If all settings are complete, don't render anything
+  if (incompleteReasons.length === 0) {
+    return null;
+  }
+
   return (
     <div className="card !px-2">
       <Accordion
@@ -25,25 +52,17 @@ export default function WhyWidgetDisable() {
         >
           <div className="mt-2">
             <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <Image
-                  src={`${process.env.NEXT_PUBLIC_BASE_PATH}/images/incomplete-icon.svg`}
-                  alt="Widget Disabled"
-                  width={18}
-                  height={18}
-                />
-                <p>Earn Setting is disabled or not yet setup</p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Image
-                  src={`${process.env.NEXT_PUBLIC_BASE_PATH}/images/incomplete-icon.svg`}
-                  alt="Widget Disabled"
-                  width={18}
-                  height={18}
-                />
-                <p>Redeem Setting is disabled or not yet setup</p>
-              </div>
+              {incompleteReasons.map((reason) => (
+                <div key={reason.key} className="flex items-center gap-2">
+                  <Image
+                    src={`${process.env.NEXT_PUBLIC_BASE_PATH}/images/incomplete-icon.svg`}
+                    alt="Widget Disabled"
+                    width={18}
+                    height={18}
+                  />
+                  <p>{reason.message}</p>
+                </div>
+              ))}
             </div>
           </div>
         </AccordionItem>

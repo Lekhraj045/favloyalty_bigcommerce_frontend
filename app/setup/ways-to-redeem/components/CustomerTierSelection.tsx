@@ -22,6 +22,8 @@ interface CustomerTierSelectionProps {
     tierIndex: number;
   }>) => void;
   onRestrictionToggle: (enabled: boolean) => void; // enabled = false means restriction is ON
+  error?: string; // Optional validation error message
+  onErrorClear?: () => void; // Optional callback to clear error
 }
 
 export default function CustomerTierSelection({
@@ -29,6 +31,8 @@ export default function CustomerTierSelection({
   customerRestrictionEnabled,
   onTiersChange,
   onRestrictionToggle,
+  error,
+  onErrorClear,
 }: CustomerTierSelectionProps) {
   const selectedChannel = useAppSelector(
     (state) => state.channel.selectedChannel
@@ -174,6 +178,10 @@ export default function CustomerTierSelection({
         };
       });
       onTiersChange(updatedTiers);
+      // Clear error when tiers are selected
+      if (onErrorClear) {
+        onErrorClear();
+      }
     } else {
       // Deselect all tiers
       const updatedTiers = tiers.map((tier, index) => {
@@ -232,6 +240,11 @@ export default function CustomerTierSelection({
     }
     
     onTiersChange(updatedTiers);
+    
+    // Clear error when a tier is selected
+    if (checked && onErrorClear) {
+      onErrorClear();
+    }
   };
 
   // Don't show component if tier system is disabled or no tiers available
@@ -241,17 +254,30 @@ export default function CustomerTierSelection({
   }
 
   return (
-    <div className="card !p-0">
+    <div className={`card !p-0 ${error ? "border border-red-500" : ""}`}>
       <div className="flex justify-between items-center gap-6 p-4 border-b border-[#DEDEDE]">
-        <span className="text-base font-bold">
-          Allow direct discount for selected customers
-        </span>
+        <div className="flex flex-col">
+          <span className="text-base font-bold">
+            Allow direct discount for selected customers
+          </span>
+          {error && (
+            <span className="text-xs text-red-500 mt-1">
+              {error}
+            </span>
+          )}
+        </div>
         <Switch
           aria-label="Allow direct discount for selected customers"
           size="sm"
           color="success"
           isSelected={!customerRestrictionEnabled}
-          onValueChange={(value) => onRestrictionToggle(!value)}
+          onValueChange={(value) => {
+            onRestrictionToggle(!value);
+            // Clear error when toggle is turned off
+            if (!value && onErrorClear) {
+              onErrorClear();
+            }
+          }}
         />
       </div>
 

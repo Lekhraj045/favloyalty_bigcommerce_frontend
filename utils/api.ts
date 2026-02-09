@@ -1318,6 +1318,38 @@ export async function updateWidgetVisibilityApi(
   return result;
 }
 
+// Reset all channel settings to default (post-installation state)
+export async function resetChannelSettingsApi(channelId: string): Promise<{
+  success: boolean;
+  message: string;
+  data?: {
+    channelId: string;
+    setupprogress: number;
+    pointsTierSystemCompleted: boolean;
+    waysToEarnCompleted: boolean;
+    waysToRedeemCompleted: boolean;
+    customiseWidgetCompleted: boolean;
+    widget_visibility: boolean;
+  };
+}> {
+  const response = await fetchWithAuth(`${API_URL}/api/channels/reset-settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ channelId }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.message ||
+        errorBody.error ||
+        "Failed to reset channel settings",
+    );
+  }
+
+  return response.json();
+}
+
 // Email Template Types
 export interface EmailTemplate {
   _id?: string;
@@ -1449,6 +1481,10 @@ export interface StorePlan {
   plan: "free" | "paid";
   trialDaysRemaining: number | null;
   paypalSubscriptionId: string | null;
+  // Subscription limit info
+  limitReached: boolean;
+  orderCount: number;
+  selectedOrderLimit: number;
 }
 
 // Get store plan information
@@ -1501,6 +1537,7 @@ export interface CustomerProfile {
   name?: string | null;
   contactNo?: string | null;
   ageGroup?: string | null;
+  gender?: string | null;
   weddingAnniversary?: Date | string | null;
   dateOfBirth?: Date | string | null;
 }
@@ -1542,11 +1579,13 @@ export interface Customer {
     tiers: { tierIndex: number; tierName: string }[];
   } | null;
   profile?: CustomerProfile;
+  dob?: Date | string | null;
   default_address?: CustomerAddress;
   tags: string[];
   storeId: string;
   channelId: number;
   refferalCount?: number; // Note: typo in backend model (refferalCount)
+  referral_points?: number; // Points earned through referrals
   bcCustomerId?: number | null; // BigCommerce customer ID
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -1774,6 +1813,32 @@ export async function getCustomerById(
   const result = await response.json();
   console.log("✅ Customer fetched successfully:", result);
   return result;
+}
+
+export interface CustomerReferral {
+  name: string;
+  email: string;
+  points: number;
+}
+
+export async function getCustomerReferrals(
+  customerId: string,
+): Promise<{ success: boolean; data: CustomerReferral[] }> {
+  const response = await fetchWithAuth(
+    `${API_URL}/api/customers/${customerId}/referrals`,
+    { method: "GET" },
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.message ||
+        errorBody.error ||
+        "Failed to fetch customer referrals",
+    );
+  }
+
+  return response.json();
 }
 
 /**
@@ -2084,12 +2149,60 @@ export interface PointsAwardedStatsResponse {
   };
 }
 
+export interface PointsRedeemedStat {
+  transactionName: string;
+  totalPointsRedeemed: number;
+  totalPointsRedeemedPrevious: number;
+  growth: number;
+}
+
+export interface PointsRedeemedStatsResponse {
+  success: boolean;
+  data: {
+    totalPointsRedeemed: number;
+    stats: PointsRedeemedStat[];
+  };
+}
+
+/**
+ * Get points redeemed statistics for dashboard
+ */
+export async function getPointsRedeemedStats(
+  storeId: string,
+  channelId: string,
+  startDate: string,
+  endDate: string,
+): Promise<PointsRedeemedStatsResponse> {
+  const queryParams = new URLSearchParams({
+    storeId,
+    channelId,
+    startDate,
+    endDate,
+  });
+
+  const response = await fetchWithAuth(
+    `${API_URL}/api/transactions/points-redeemed-stats?${queryParams.toString()}`,
+    { method: "GET" },
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.message ||
+        errorBody.error ||
+        "Failed to fetch points redeemed stats",
+    );
+  }
+
+  return response.json();
+}
+
 /**
  * Get points awarded statistics for dashboard
  */
 export async function getPointsAwardedStats(
   storeId: string,
-  channelId: number,
+  channelId: string,
   startDate: string,
   endDate: string,
 ): Promise<PointsAwardedStatsResponse> {
@@ -2102,7 +2215,7 @@ export async function getPointsAwardedStats(
 
   const queryParams = new URLSearchParams({
     storeId,
-    channelId: channelId.toString(),
+    channelId,
     startDate,
     endDate,
   });

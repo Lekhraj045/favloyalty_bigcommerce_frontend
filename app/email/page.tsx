@@ -563,9 +563,9 @@ export default function EmailsPage() {
     useState<string>("");
   const hasDisabledRestrictedEmailsRef = useRef<boolean>(false);
 
-  // Helper function to check if user is on free plan
+  // Helper function to check if user is on free plan or order limit reached
   const isFreePlan = () => {
-    return storePlan?.plan === "free";
+    return storePlan?.plan === "free" || storePlan?.limitReached === true;
   };
 
   // Helper function to show upgrade modal for a specific feature
@@ -696,6 +696,9 @@ export default function EmailsPage() {
           plan: "free",
           trialDaysRemaining: null,
           paypalSubscriptionId: null,
+          limitReached: false,
+          orderCount: 0,
+          selectedOrderLimit: 0,
         });
       }
     };
@@ -1116,7 +1119,7 @@ export default function EmailsPage() {
 
             <div className="flex flex-shrink-0 gap-2.5 items-center">
               <ChannelSelector />
-              {storePlan?.plan === "free" && (
+              {(storePlan?.plan === "free" || storePlan?.limitReached) && (
                 <Button className="custom-btn">Upgrade</Button>
               )}
             </div>

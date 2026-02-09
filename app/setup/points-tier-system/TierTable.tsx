@@ -22,6 +22,7 @@ interface TierTableProps {
     multiplier?: string;
   };
   resetEditing?: boolean;
+  onTierValidationError?: (errors: Record<number, { pointRequired?: string; multiplier?: string }>) => void;
 }
 
 export default function TierTable({
@@ -30,16 +31,20 @@ export default function TierTable({
   onTierUpdate,
   validationErrors,
   resetEditing = false,
+  onTierValidationError,
 }: TierTableProps) {
   const [editing, setEditing] = useState<boolean>(false);
   // Track input strings for multipliers to allow smooth decimal typing
   const [multiplierInputs, setMultiplierInputs] = useState<Record<number, string>>({});
+  // Track local validation errors for progressive tier values
+  const [tierErrors, setTierErrors] = useState<Record<number, { pointRequired?: string; multiplier?: string }>>({});
 
   // Reset editing state when resetEditing prop changes to true
   useEffect(() => {
     if (resetEditing && editing) {
       setEditing(false);
       setMultiplierInputs({}); // Clear input strings when resetting
+      setTierErrors({}); // Clear errors when resetting
     }
   }, [resetEditing, editing]);
 
@@ -56,8 +61,50 @@ export default function TierTable({
     }
   }, [editing, tiers.length]);
 
+  // Validate tier values and update errors
+  const validateTiers = (updatedTiers: Tier[]) => {
+    const newErrors: Record<number, { pointRequired?: string; multiplier?: string }> = {};
+    
+    for (let i = 1; i < updatedTiers.length; i++) {
+      const currentTier = updatedTiers[i];
+      const prevTier = updatedTiers[i - 1];
+      
+      // Validate Points Required: each tier must have higher points than previous
+      if (currentTier.pointRequired <= prevTier.pointRequired) {
+        newErrors[i] = {
+          ...newErrors[i],
+          pointRequired: `Must be greater than Tier ${i}'s points (${prevTier.pointRequired})`,
+        };
+      }
+      
+      // Validate Multiplier: each tier must have higher multiplier than previous
+      const currentMultiplier = currentTier.multiplier || 1;
+      const prevMultiplier = prevTier.multiplier || 1;
+      if (currentMultiplier <= prevMultiplier) {
+        newErrors[i] = {
+          ...newErrors[i],
+          multiplier: `Must be greater than Tier ${i}'s multiplier (${prevMultiplier})`,
+        };
+      }
+    }
+    
+    setTierErrors(newErrors);
+    onTierValidationError?.(newErrors);
+  };
+
+  // Validate whenever tiers change
+  useEffect(() => {
+    if (editing) {
+      validateTiers(tiers);
+    }
+  }, [tiers, editing]);
+
   const handleEdit = () => {
     setEditing(!editing);
+    if (!editing) {
+      // Clear errors when starting to edit
+      setTierErrors({});
+    }
   };
 
   const handleTierNameChange = (index: number, value: string) => {
@@ -68,6 +115,8 @@ export default function TierTable({
   const handlePointRequiredChange = (index: number, value: string) => {
     const sanitized = value.replace(/[^0-9]/g, "").slice(0, 6);
     const numValue = sanitized === "" ? 0 : parseInt(sanitized, 10);
+    
+    // Just update the value - validation will happen automatically via useEffect
     onTierUpdate?.(index, "pointRequired", numValue);
   };
 
@@ -77,7 +126,6 @@ export default function TierTable({
 
     // Handle empty input
     if (sanitized === "" || sanitized === ".") {
-      // Keep the input string but don't update the multiplier yet
       setMultiplierInputs((prev) => ({
         ...prev,
         [index]: sanitized,
@@ -94,18 +142,12 @@ export default function TierTable({
       sanitized = beforeDecimal + "." + afterDecimal.substring(0, 2);
     }
 
-    // Check if the value exceeds 9.99 before parsing
-    const numValue = parseFloat(sanitized);
+    let numValue = parseFloat(sanitized);
     if (!isNaN(numValue)) {
       // Enforce maximum value of 9.99
       if (numValue > 9.99) {
+        numValue = 9.99;
         sanitized = "9.99";
-        setMultiplierInputs((prev) => ({
-          ...prev,
-          [index]: "9.99",
-        }));
-        onTierUpdate?.(index, "multiplier", 9.99);
-        return;
       }
       
       // Update the input string state
@@ -114,7 +156,7 @@ export default function TierTable({
         [index]: sanitized,
       }));
       
-      // Update multiplier
+      // Just update the value - validation will happen automatically via useEffect
       onTierUpdate?.(index, "multiplier", numValue);
     } else {
       // Update input string even if not a valid number (for typing experience)
@@ -191,23 +233,28 @@ export default function TierTable({
             {tiers.map((tier, index) => (
               <TableCell key={`points-required-${index}`}>
                 {editing ? (
-                  <input
-                    type="text"
-                    value={tier.pointRequired}
-                    onChange={(e) =>
-                      handlePointRequiredChange(index, e.target.value)
-                    }
-                    disabled={index === 0}
-                    className={`w-full border rounded px-2 py-1 text-xs ${
-                      validationErrors?.pointRequired &&
-                      (tier.pointRequired === undefined ||
-                        tier.pointRequired < 0)
-                        ? "border-red-500"
-                        : "border-gray-300"
-                    } ${index === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
-                    placeholder="0"
-                    maxLength={6}
-                  />
+                  <div className="flex flex-col">
+                    <input
+                      type="text"
+                      value={tier.pointRequired}
+                      onChange={(e) =>
+                        handlePointRequiredChange(index, e.target.value)
+                      }
+                      disabled={index === 0}
+                      className={`w-full border rounded px-2 py-1 text-xs ${
+                        tierErrors[index]?.pointRequired
+                          ? "border-red-500"
+                          : "border-gray-300"
+                      } ${index === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+                      placeholder="0"
+                      maxLength={6}
+                    />
+                    {tierErrors[index]?.pointRequired && (
+                      <span className="text-[10px] text-red-500 mt-0.5">
+                        {tierErrors[index].pointRequired}
+                      </span>
+                    )}
+                  </div>
                 ) : (
                   tier.pointRequired
                 )}
@@ -222,43 +269,49 @@ export default function TierTable({
             {tiers.map((tier, index) => (
               <TableCell key={`multiplier-${index}`}>
                 {editing ? (
-                  <input
-                    type="text"
-                    value={multiplierInputs[index] !== undefined 
-                      ? multiplierInputs[index] 
-                      : (tier.multiplier === undefined || tier.multiplier === null 
-                          ? "" 
-                          : tier.multiplier.toString())}
-                    onChange={(e) =>
-                      handleMultiplierChange(index, e.target.value)
-                    }
-                    onBlur={() => {
-                      // On blur, ensure the value is properly formatted and within limits
-                      const currentInput = multiplierInputs[index];
-                      if (currentInput && currentInput !== "") {
-                        let numValue = parseFloat(currentInput);
-                        if (!isNaN(numValue)) {
-                          // Enforce maximum value of 9.99
-                          if (numValue > 9.99) {
-                            numValue = 9.99;
-                          }
-                          onTierUpdate?.(index, "multiplier", numValue);
-                          setMultiplierInputs((prev) => ({
-                            ...prev,
-                            [index]: numValue.toString(),
-                          }));
-                        }
+                  <div className="flex flex-col">
+                    <input
+                      type="text"
+                      value={multiplierInputs[index] !== undefined 
+                        ? multiplierInputs[index] 
+                        : (tier.multiplier === undefined || tier.multiplier === null 
+                            ? "" 
+                            : tier.multiplier.toString())}
+                      onChange={(e) =>
+                        handleMultiplierChange(index, e.target.value)
                       }
-                    }}
-                    disabled={index === 0}
-                    className={`w-full border rounded px-2 py-1 text-xs ${
-                      validationErrors?.multiplier &&
-                      (tier.multiplier === undefined || tier.multiplier <= 0)
-                        ? "border-red-500"
-                        : "border-gray-300"
-                    } ${index === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
-                    placeholder="1.00"
-                  />
+                      onBlur={() => {
+                        // On blur, just ensure the value is properly formatted
+                        const currentInput = multiplierInputs[index];
+                        if (currentInput && currentInput !== "") {
+                          let numValue = parseFloat(currentInput);
+                          if (!isNaN(numValue)) {
+                            // Enforce maximum value of 9.99
+                            if (numValue > 9.99) {
+                              numValue = 9.99;
+                            }
+                            onTierUpdate?.(index, "multiplier", numValue);
+                            setMultiplierInputs((prev) => ({
+                              ...prev,
+                              [index]: numValue.toString(),
+                            }));
+                          }
+                        }
+                      }}
+                      disabled={index === 0}
+                      className={`w-full border rounded px-2 py-1 text-xs ${
+                        tierErrors[index]?.multiplier
+                          ? "border-red-500"
+                          : "border-gray-300"
+                      } ${index === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+                      placeholder="1.00"
+                    />
+                    {tierErrors[index]?.multiplier && (
+                      <span className="text-[10px] text-red-500 mt-0.5">
+                        {tierErrors[index].multiplier}
+                      </span>
+                    )}
+                  </div>
                 ) : (
                   tier.multiplier
                 )}

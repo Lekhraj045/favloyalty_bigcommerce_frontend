@@ -48,9 +48,9 @@ export default function FixedDiscountForm({
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
   const hasDisabledMaxPointsRef = useRef<boolean>(false);
 
-  // Helper function to check if user is on free plan
+  // Helper function to check if user is on free plan or order limit reached
   const isFreePlan = () => {
-    return storePlan?.plan === "free";
+    return storePlan?.plan === "free" || storePlan?.limitReached === true;
   };
 
   // Helper function to show upgrade modal
@@ -63,6 +63,7 @@ export default function FixedDiscountForm({
     points?: string;
     expireCoupon?: string;
     maxPoints?: string;
+    customerTierSelection?: string;
   }>({});
 
   // Load store plan information
@@ -74,17 +75,17 @@ export default function FixedDiscountForm({
       } catch (error) {
         console.error("Error loading store plan:", error);
         // Default to free plan if error
-        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null });
+        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null, limitReached: false, orderCount: 0, selectedOrderLimit: 0 });
       }
     };
     loadStorePlan();
   }, []);
 
-  // Disable maxPointsEnabled for free users if it's enabled
+  // Disable maxPointsEnabled for free users or when limit reached if it's enabled
   useEffect(() => {
     if (
       storePlan &&
-      storePlan.plan === "free" &&
+      (storePlan.plan === "free" || storePlan.limitReached === true) &&
       maxPointsEnabled &&
       !hasDisabledMaxPointsRef.current
     ) {
@@ -234,6 +235,17 @@ export default function FixedDiscountForm({
       const maxPointsNum = parseInt(maxPoints);
       if (!maxPoints || isNaN(maxPointsNum) || maxPointsNum < 1 || maxPointsNum > 100000) {
         newErrors.maxPoints = "Maximum points must be between 1 and 1,00,000 (whole numbers only)";
+      }
+    }
+
+    // Validate customer tier selection when restriction is enabled
+    // customerRestrictionEnabled: true = disabled (no restriction), false = enabled (restriction ON)
+    if (!customerRestrictionEnabled) {
+      // Restriction is enabled, check if at least one tier is selected
+      const hasSelectedTier = selectedTiers.some((tier) => tier.status === true);
+      if (!hasSelectedTier) {
+        newErrors.customerTierSelection =
+          "Please select at least one customer tier or disable the customer restriction";
       }
     }
 
@@ -594,6 +606,8 @@ export default function FixedDiscountForm({
         customerRestrictionEnabled={customerRestrictionEnabled}
         onTiersChange={setSelectedTiers}
         onRestrictionToggle={setCustomerRestrictionEnabled}
+        error={errors.customerTierSelection}
+        onErrorClear={() => setErrors((prev) => ({ ...prev, customerTierSelection: undefined }))}
       />
 
       <div className="flex items-center justify-end mt-4">

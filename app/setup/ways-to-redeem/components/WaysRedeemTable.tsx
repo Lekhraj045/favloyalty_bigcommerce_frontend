@@ -62,6 +62,17 @@ const formatRedeemType = (redeemType: string): string => {
 
 // Helper function to format coupon name/description
 const getCouponDisplayName = (coupon: RedeemCoupon): string => {
+  // For freeProduct, show the product name from selectedItems
+  if (coupon.redeemType === "freeProduct") {
+    const items = coupon.coupon?.restriction?.selectedItems?.items;
+    if (items?.length) {
+      return items[0].value;
+    }
+    if (coupon.coupon?.name) {
+      return coupon.coupon.name;
+    }
+    return "Free Product";
+  }
   if (coupon.coupon?.name) {
     return coupon.coupon.name;
   }
@@ -72,6 +83,16 @@ const getCouponDisplayName = (coupon: RedeemCoupon): string => {
     return `${coupon.coupon.value}% off`;
   }
   return formatRedeemType(coupon.redeemType);
+};
+
+// Helper to get the first free product image URL
+const getFreeProductImageUrl = (coupon: RedeemCoupon): string | null => {
+  if (coupon.redeemType !== "freeProduct") return null;
+  const items = coupon.coupon?.restriction?.selectedItems?.items;
+  if (items?.length && items[0].imgUrl) {
+    return items[0].imgUrl;
+  }
+  return null;
 };
 
 // Helper to get display points (for freeProduct use coupon.value or min of product points)
@@ -293,6 +314,7 @@ export default function WaysRedeemTable({
             const expiryDays = getExpiryDays(coupon);
             const isActive = coupon.coupon?.active || false;
             const iconPath = getRedeemTypeIcon(coupon.redeemType);
+            const freeProductImage = getFreeProductImageUrl(coupon);
 
             const rowKey =
               coupon._id ||
@@ -307,17 +329,31 @@ export default function WaysRedeemTable({
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <div
-                      className={`border border-[#DEDEDE] rounded-lg p-2 w-10 h-10 max-w-10 max-h-10 flex items-center justify-center relative ${
-                        isPremium ? "opacity-60 blur-[0.5px]" : ""
-                      }`}
+                      className={`border border-[#DEDEDE] rounded-lg overflow-hidden w-10 h-10 max-w-10 max-h-10 flex items-center justify-center relative ${
+                        freeProductImage ? "" : "p-2"
+                      } ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}
                     >
-                      <Image
-                        src={iconPath}
-                        width={24}
-                        height={24}
-                        alt={redeemType}
-                        priority
-                      />
+                      {freeProductImage ? (
+                        <Image
+                          src={freeProductImage}
+                          width={40}
+                          height={40}
+                          alt={couponName}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = iconPath;
+                            (e.target as HTMLImageElement).className = "w-6 h-6";
+                          }}
+                        />
+                      ) : (
+                        <Image
+                          src={iconPath}
+                          width={24}
+                          height={24}
+                          alt={redeemType}
+                          priority
+                        />
+                      )}
                       {isPremium && (
                         <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center z-10">
                           <svg
@@ -331,7 +367,8 @@ export default function WaysRedeemTable({
                       )}
                     </div>
                     <span
-                      className={`font-bold ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}
+                      className={`font-bold truncate max-w-[150px] ${isPremium ? "opacity-60 blur-[0.5px]" : ""}`}
+                      title={couponName}
                     >
                       {couponName}
                     </span>

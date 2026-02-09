@@ -47,6 +47,7 @@ export default function FreeShippingForm({
     pointValue?: string;
     expireCoupon?: string;
     minPurchaseAmount?: string;
+    customerTierSelection?: string;
   }>({});
 
   // Load coupon data when editing, or reset form when creating new
@@ -66,8 +67,11 @@ export default function FreeShippingForm({
       if (coupon.coupon.restriction?.minimumPurchaseAmount) {
         const minPurchase = coupon.coupon.restriction.minimumPurchaseAmount;
         setMinPurchaseEnabled(minPurchase.status || false);
-        if (minPurchase.status && minPurchase.value) {
+        // Always load the value if it exists, regardless of status
+        if (minPurchase.value != null && minPurchase.value > 0) {
           setMinPurchaseAmount(minPurchase.value.toString());
+        } else {
+          setMinPurchaseAmount("");
         }
       } else {
         setMinPurchaseEnabled(false);
@@ -201,6 +205,17 @@ export default function FreeShippingForm({
       }
     }
 
+    // Validate customer tier selection when restriction is enabled
+    // customerRestrictionEnabled: true = disabled (no restriction), false = enabled (restriction ON)
+    if (!customerRestrictionEnabled) {
+      // Restriction is enabled, check if at least one tier is selected
+      const hasSelectedTier = selectedTiers.some((tier) => tier.status === true);
+      if (!hasSelectedTier) {
+        newErrors.customerTierSelection =
+          "Please select at least one customer tier or disable the customer restriction";
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -248,7 +263,7 @@ export default function FreeShippingForm({
         onlineStoreDashBoardDisable: false,
         redemptionLimitDisable: true,
         minimumnPurchaseAmountDisable: !minPurchaseEnabled, // false = enabled, true = disabled
-        minimumnPurchaseAmount: minPurchaseEnabled ? parseFloat(minPurchaseAmount) : 0,
+        minimumnPurchaseAmount: minPurchaseAmount ? parseFloat(minPurchaseAmount) : 0, // Preserve value even when disabled
       };
 
       let result;
@@ -490,6 +505,8 @@ export default function FreeShippingForm({
         customerRestrictionEnabled={customerRestrictionEnabled}
         onTiersChange={setSelectedTiers}
         onRestrictionToggle={setCustomerRestrictionEnabled}
+        error={errors.customerTierSelection}
+        onErrorClear={() => setErrors((prev) => ({ ...prev, customerTierSelection: undefined }))}
       />
 
       <div className="flex items-center justify-end mt-4">
