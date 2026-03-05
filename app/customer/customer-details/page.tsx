@@ -39,6 +39,7 @@ function CustomerDetailsContent() {
     useState(false);
   const [transactionRefreshKey, setTransactionRefreshKey] = useState(0);
   const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
+  const viewOnly = searchParams.get("viewOnly") === "1";
 
   // Fetch customer data
   const fetchCustomer = async () => {
@@ -216,7 +217,7 @@ function CustomerDetailsContent() {
                         <Skeleton className="h-4 w-24 rounded" />
                         <Skeleton className="h-6 w-16 rounded" />
                       </div>
-                      <Skeleton className="h-9 w-32 rounded" />
+                      {!viewOnly && <Skeleton className="h-9 w-32 rounded" />}
                     </div>
                   </div>
                   <div className="card">
@@ -317,7 +318,12 @@ function CustomerDetailsContent() {
             <div className="flex gap-2.5 items-center">
               {/* Only show Upgrade button for free plan users or when limit reached */}
               {(storePlan?.plan === "free" || storePlan?.limitReached) && (
-                <Button className="custom-btn">Upgrade</Button>
+                <Button
+                  onClick={() => router.push("/pricing")}
+                  className="custom-btn"
+                >
+                  Upgrade
+                </Button>
               )}
             </div>
           </div>
@@ -385,12 +391,14 @@ function CustomerDetailsContent() {
                         </h2>
                       </div>
 
-                      <Button
-                        className="custom-btn"
-                        onPress={() => setIsAdjustBalanceModalOpen(true)}
-                      >
-                        Adjust Balance
-                      </Button>
+                      {!viewOnly && (
+                        <Button
+                          className="custom-btn"
+                          onPress={() => setIsAdjustBalanceModalOpen(true)}
+                        >
+                          Adjust Balance
+                        </Button>
+                      )}
                     </div>
                   </div>
 

@@ -6,6 +6,7 @@ interface ChannelState {
   channels: Channel[];
   loading: boolean;
   error: string | null;
+  storeCurrency: string;
 }
 
 const initialState: ChannelState = {
@@ -13,6 +14,7 @@ const initialState: ChannelState = {
   channels: [],
   loading: false,
   error: null,
+  storeCurrency: "USD",
 };
 
 // Load selected channel from localStorage on initialization
@@ -21,7 +23,12 @@ const loadSelectedChannelFromStorage = (): Channel | null => {
   const stored = localStorage.getItem("redux_selected_channel");
   if (stored) {
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Only load if it's an active BigCommerce-platform channel
+      if (parsed?.status === "active" && parsed?.platform === "bigcommerce") {
+        return parsed;
+      }
+      return null;
     } catch {
       return null;
     }
@@ -35,7 +42,12 @@ const loadChannelsFromStorage = (): Channel[] => {
   const stored = localStorage.getItem("bc_channels");
   if (stored) {
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Only load active BigCommerce-platform channels
+      return parsed.filter(
+        (ch: Channel) =>
+          ch.status === "active" && ch.platform === "bigcommerce",
+      );
     } catch {
       return [];
     }
@@ -59,8 +71,8 @@ export const fetchChannels = createAsyncThunk(
   "channel/fetchChannels",
   async (storeId: string, { rejectWithValue }) => {
     try {
-      const channels = await getChannels(storeId);
-      return channels;
+      const { channels, storeCurrency } = await getChannels(storeId);
+      return { channels, storeCurrency };
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to fetch channels");
     }
@@ -226,14 +238,15 @@ const channelSlice = createSlice({
       })
       .addCase(fetchChannels.fulfilled, (state, action) => {
         state.loading = false;
-        state.channels = action.payload;
+        state.channels = action.payload.channels;
+        state.storeCurrency = action.payload.storeCurrency || "USD";
         // Auto-select first channel if none selected
-        if (!state.selectedChannel && action.payload.length > 0) {
-          state.selectedChannel = action.payload[0];
+        if (!state.selectedChannel && action.payload.channels.length > 0) {
+          state.selectedChannel = action.payload.channels[0];
           if (typeof window !== "undefined") {
             localStorage.setItem(
               "redux_selected_channel",
-              JSON.stringify(action.payload[0]),
+              JSON.stringify(action.payload.channels[0]),
             );
           }
         }

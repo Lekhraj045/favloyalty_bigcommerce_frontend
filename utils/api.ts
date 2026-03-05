@@ -205,7 +205,10 @@ export function getStoreId(): string | null {
 }
 
 // Fetch channels for a store
-export async function getChannels(storeId: string): Promise<Channel[]> {
+export async function getChannels(storeId: string): Promise<{
+  channels: Channel[];
+  storeCurrency: string | null;
+}> {
   console.log("📥 Fetching channels for store:", storeId);
 
   const response = await fetchWithAuth(
@@ -227,15 +230,22 @@ export async function getChannels(storeId: string): Promise<Channel[]> {
   console.log("✅ Channels fetched successfully:", result);
 
   // Handle both array response and object with channels property
-  if (Array.isArray(result)) {
-    return result;
-  } else if (result.channels && Array.isArray(result.channels)) {
-    return result.channels;
-  } else if (result.data && Array.isArray(result.data)) {
-    return result.data;
+  if (result.channels && Array.isArray(result.channels)) {
+    return {
+      channels: result.channels,
+      storeCurrency: result.storeCurrency ?? "USD",
+    };
   }
-
-  return [];
+  if (Array.isArray(result)) {
+    return { channels: result, storeCurrency: "USD" };
+  }
+  if (result.data && Array.isArray(result.data)) {
+    return {
+      channels: result.data,
+      storeCurrency: result.storeCurrency ?? "USD",
+    };
+  }
+  return { channels: [], storeCurrency: "USD" };
 }
 
 export type Channel = {
@@ -1332,11 +1342,14 @@ export async function resetChannelSettingsApi(channelId: string): Promise<{
     widget_visibility: boolean;
   };
 }> {
-  const response = await fetchWithAuth(`${API_URL}/api/channels/reset-settings`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ channelId }),
-  });
+  const response = await fetchWithAuth(
+    `${API_URL}/api/channels/reset-settings`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channelId }),
+    },
+  );
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
@@ -2146,6 +2159,7 @@ export interface PointsAwardedStatsResponse {
   data: {
     totalPointsAwarded: number;
     stats: PointsAwardedStat[];
+    totalPointsAwardedEquivalent: number;
   };
 }
 

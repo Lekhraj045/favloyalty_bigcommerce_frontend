@@ -1,15 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useAppSelector } from "@/store/hooks";
+import {
+  createRedeemCoupon,
+  getStoreId,
+  updateRedeemCoupon,
+  type CreateRedeemCouponData,
+  type RedeemCoupon,
+} from "@/utils/api";
 import { Button } from "@heroui/button";
 import { Switch } from "@heroui/switch";
-import { ArrowLeft } from "lucide-react";
-import { useAppSelector } from "@/store/hooks";
-import { getStoreId } from "@/utils/api";
-import { createRedeemCoupon, updateRedeemCoupon, type CreateRedeemCouponData, type RedeemCoupon } from "@/utils/api";
 import { addToast } from "@heroui/toast";
-import CustomerTierSelection from "./CustomerTierSelection";
+import { ArrowLeft } from "lucide-react";
+import { useEffect, useState } from "react";
 import { validateTiers } from "../utils/tierValidation";
+import CustomerTierSelection from "./CustomerTierSelection";
 
 interface FreeShippingFormProps {
   onBack: () => void;
@@ -23,7 +28,7 @@ export default function FreeShippingForm({
   coupon,
 }: FreeShippingFormProps) {
   const selectedChannel = useAppSelector(
-    (state) => state.channel.selectedChannel
+    (state) => state.channel.selectedChannel,
   );
   const storeId = getStoreId();
   const channelId = selectedChannel?.id || null;
@@ -33,13 +38,16 @@ export default function FreeShippingForm({
   const [expireCoupon, setExpireCoupon] = useState<string>("");
   const [minPurchaseEnabled, setMinPurchaseEnabled] = useState<boolean>(false); // OFF by default
   const [minPurchaseAmount, setMinPurchaseAmount] = useState<string>("");
-  const [selectedTiers, setSelectedTiers] = useState<Array<{
-    status: boolean;
-    name: string;
-    tierId: string;
-    tierIndex: number;
-  }>>([]);
-  const [customerRestrictionEnabled, setCustomerRestrictionEnabled] = useState<boolean>(true); // true = disabled (no restriction)
+  const [selectedTiers, setSelectedTiers] = useState<
+    Array<{
+      status: boolean;
+      name: string;
+      tierId: string;
+      tierIndex: number;
+    }>
+  >([]);
+  const [customerRestrictionEnabled, setCustomerRestrictionEnabled] =
+    useState<boolean>(true); // true = disabled (no restriction)
   const [loading, setLoading] = useState(false);
 
   // Validation errors
@@ -55,7 +63,7 @@ export default function FreeShippingForm({
     if (coupon && coupon.coupon) {
       // Pre-populate form fields with existing coupon data
       setPointValue(coupon.coupon.value?.toString() || "");
-      
+
       // Handle expiry - convert days to string if hasExpiry is true
       if (coupon.coupon.hasExpiry && coupon.coupon.expire) {
         setExpireCoupon(coupon.coupon.expire.toString());
@@ -112,20 +120,20 @@ export default function FreeShippingForm({
   const handlePointValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     // Remove any decimal points and non-numeric characters except empty string
-    let wholeNumber = value.replace(/[^\d]/g, '');
-    
+    let wholeNumber = value.replace(/[^\d]/g, "");
+
     // Enforce maximum value of 999999
     if (wholeNumber && parseInt(wholeNumber) > 999999) {
-      wholeNumber = '999999';
+      wholeNumber = "999999";
     }
-    
+
     setPointValue(wholeNumber);
-    
+
     // Clear error if value is now valid
     if (errors.pointValue && wholeNumber) {
       const num = parseInt(wholeNumber);
       if (!isNaN(num) && num >= 1 && num <= 999999) {
-        setErrors(prev => ({ ...prev, pointValue: undefined }));
+        setErrors((prev) => ({ ...prev, pointValue: undefined }));
       }
     }
   };
@@ -133,49 +141,51 @@ export default function FreeShippingForm({
   const handleExpireCouponChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     // Remove any decimal points and non-numeric characters except empty string
-    let wholeNumber = value.replace(/[^\d]/g, '');
-    
+    let wholeNumber = value.replace(/[^\d]/g, "");
+
     // Enforce maximum value of 365
     if (wholeNumber && parseInt(wholeNumber) > 365) {
-      wholeNumber = '365';
+      wholeNumber = "365";
     }
-    
+
     setExpireCoupon(wholeNumber);
-    
+
     // Clear error if value is now valid
     if (errors.expireCoupon && wholeNumber) {
       const num = parseInt(wholeNumber);
       if (!isNaN(num) && num >= 1 && num <= 365) {
-        setErrors(prev => ({ ...prev, expireCoupon: undefined }));
+        setErrors((prev) => ({ ...prev, expireCoupon: undefined }));
       }
     }
   };
 
-  const handleMinPurchaseAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMinPurchaseAmountChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const value = e.target.value;
     // Allow decimal numbers for purchase amount
     // Remove any non-numeric characters except decimal point
-    let numericValue = value.replace(/[^\d.]/g, '');
-    
+    let numericValue = value.replace(/[^\d.]/g, "");
+
     // Ensure only one decimal point
-    const parts = numericValue.split('.');
+    const parts = numericValue.split(".");
     if (parts.length > 2) {
-      numericValue = parts[0] + '.' + parts.slice(1).join('');
+      numericValue = parts[0] + "." + parts.slice(1).join("");
     }
-    
+
     // Enforce maximum value of 999999.99
     const numValue = parseFloat(numericValue);
     if (!isNaN(numValue) && numValue > 999999.99) {
-      numericValue = '999999.99';
+      numericValue = "999999.99";
     }
-    
+
     setMinPurchaseAmount(numericValue);
-    
+
     // Clear error if value is now valid
     if (errors.minPurchaseAmount && numericValue) {
       const num = parseFloat(numericValue);
       if (!isNaN(num) && num >= 0.01 && num <= 999999.99) {
-        setErrors(prev => ({ ...prev, minPurchaseAmount: undefined }));
+        setErrors((prev) => ({ ...prev, minPurchaseAmount: undefined }));
       }
     }
   };
@@ -185,23 +195,36 @@ export default function FreeShippingForm({
 
     // Validate pointValue (1-999,999) - only whole numbers
     const pointValueNum = parseInt(pointValue);
-    if (!pointValue || isNaN(pointValueNum) || pointValueNum < 1 || pointValueNum > 999999) {
-      newErrors.pointValue = "Point value must be between 1 and 999,999 (whole numbers only)";
+    if (
+      !pointValue ||
+      isNaN(pointValueNum) ||
+      pointValueNum < 1 ||
+      pointValueNum > 999999
+    ) {
+      newErrors.pointValue =
+        "Point value must be between 1 and 999,999 (whole numbers only)";
     }
 
     // Validate expireCoupon (optional, but if provided must be 1-365) - only whole numbers
     if (expireCoupon.trim() !== "") {
       const expireNum = parseInt(expireCoupon);
       if (isNaN(expireNum) || expireNum < 1 || expireNum > 365) {
-        newErrors.expireCoupon = "Expiry days must be between 1 and 365 (whole numbers only)";
+        newErrors.expireCoupon =
+          "Expiry days must be between 1 and 365 (whole numbers only)";
       }
     }
 
     // Validate minPurchaseAmount if enabled
     if (minPurchaseEnabled) {
       const minPurchaseNum = parseFloat(minPurchaseAmount);
-      if (!minPurchaseAmount || isNaN(minPurchaseNum) || minPurchaseNum < 0.01 || minPurchaseNum > 999999.99) {
-        newErrors.minPurchaseAmount = "Minimum purchase amount must be between 0.01 and 999,999.99";
+      if (
+        !minPurchaseAmount ||
+        isNaN(minPurchaseNum) ||
+        minPurchaseNum < 0.01 ||
+        minPurchaseNum > 999999.99
+      ) {
+        newErrors.minPurchaseAmount =
+          "Minimum purchase amount must be between 0.01 and 999,999.99";
       }
     }
 
@@ -209,7 +232,9 @@ export default function FreeShippingForm({
     // customerRestrictionEnabled: true = disabled (no restriction), false = enabled (restriction ON)
     if (!customerRestrictionEnabled) {
       // Restriction is enabled, check if at least one tier is selected
-      const hasSelectedTier = selectedTiers.some((tier) => tier.status === true);
+      const hasSelectedTier = selectedTiers.some(
+        (tier) => tier.status === true,
+      );
       if (!hasSelectedTier) {
         newErrors.customerTierSelection =
           "Please select at least one customer tier or disable the customer restriction";
@@ -263,21 +288,28 @@ export default function FreeShippingForm({
         onlineStoreDashBoardDisable: false,
         redemptionLimitDisable: true,
         minimumnPurchaseAmountDisable: !minPurchaseEnabled, // false = enabled, true = disabled
-        minimumnPurchaseAmount: minPurchaseAmount ? parseFloat(minPurchaseAmount) : 0, // Preserve value even when disabled
+        minimumnPurchaseAmount: minPurchaseAmount
+          ? parseFloat(minPurchaseAmount)
+          : 0, // Preserve value even when disabled
       };
 
       let result;
       if (isEditMode && coupon?._id) {
         // Update existing coupon
-        result = await updateRedeemCoupon(coupon._id, storeId, channelId, couponData);
-        
+        result = await updateRedeemCoupon(
+          coupon._id,
+          storeId,
+          channelId,
+          couponData,
+        );
+
         if (result.success) {
           addToast({
             title: "Success",
             description: "Free shipping coupon updated successfully",
             color: "success",
           });
-          
+
           // Call success callback or go back
           if (onSuccess) {
             onSuccess();
@@ -288,14 +320,14 @@ export default function FreeShippingForm({
       } else {
         // Create new coupon
         result = await createRedeemCoupon(storeId, channelId, couponData);
-        
+
         if (result.success) {
           addToast({
             title: "Success",
             description: "Free shipping coupon created successfully",
             color: "success",
           });
-          
+
           // Reset form
           setPointValue("");
           setExpireCoupon("");
@@ -303,7 +335,7 @@ export default function FreeShippingForm({
           setMinPurchaseAmount("");
           setCustomerRestrictionEnabled(true);
           setSelectedTiers([]);
-          
+
           // Call success callback or go back
           if (onSuccess) {
             onSuccess();
@@ -336,7 +368,9 @@ export default function FreeShippingForm({
             <ArrowLeft size={20} color="#000000" strokeWidth={2} />
           </button>
           <h2 className="text-base font-bold">
-            {isEditMode ? "Edit Free Shipping Coupon" : "Create Free Shipping Coupon"}
+            {isEditMode
+              ? "Edit Free Shipping Coupon"
+              : "Create Free Shipping Coupon"}
           </h2>
         </div>
 
@@ -366,7 +400,10 @@ export default function FreeShippingForm({
                   return;
                 }
                 // Ensure that it is a number and stop the keypress
-                if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                if (
+                  (e.shiftKey || e.keyCode < 48 || e.keyCode > 57) &&
+                  (e.keyCode < 96 || e.keyCode > 105)
+                ) {
                   e.preventDefault();
                 }
               }}
@@ -375,7 +412,11 @@ export default function FreeShippingForm({
                 if (pointValue) {
                   const num = parseInt(pointValue);
                   if (isNaN(num) || num < 1 || num > 999999) {
-                    setErrors(prev => ({ ...prev, pointValue: "Point value must be between 1 and 999,999 (whole numbers only)" }));
+                    setErrors((prev) => ({
+                      ...prev,
+                      pointValue:
+                        "Point value must be between 1 and 999,999 (whole numbers only)",
+                    }));
                   }
                 }
               }}
@@ -385,7 +426,9 @@ export default function FreeShippingForm({
               }`}
             />
             {errors.pointValue ? (
-              <p className="text-xs text-red-500 mt-1">{errors.pointValue}</p>
+              <span className="text-xs text-red-500 mt-1">
+                {errors.pointValue}
+              </span>
             ) : (
               <p className="text-xs text-gray-500 mt-1">
                 Maximum 999,999 points allowed
@@ -418,7 +461,10 @@ export default function FreeShippingForm({
                   return;
                 }
                 // Ensure that it is a number and stop the keypress
-                if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                if (
+                  (e.shiftKey || e.keyCode < 48 || e.keyCode > 57) &&
+                  (e.keyCode < 96 || e.keyCode > 105)
+                ) {
                   e.preventDefault();
                 }
               }}
@@ -427,7 +473,11 @@ export default function FreeShippingForm({
                 if (expireCoupon.trim()) {
                   const num = parseInt(expireCoupon);
                   if (isNaN(num) || num < 1 || num > 365) {
-                    setErrors(prev => ({ ...prev, expireCoupon: "Expiry days must be between 1 and 365 (whole numbers only)" }));
+                    setErrors((prev) => ({
+                      ...prev,
+                      expireCoupon:
+                        "Expiry days must be between 1 and 365 (whole numbers only)",
+                    }));
                   }
                 }
               }}
@@ -478,17 +528,25 @@ export default function FreeShippingForm({
                   if (minPurchaseEnabled && minPurchaseAmount) {
                     const num = parseFloat(minPurchaseAmount);
                     if (isNaN(num) || num < 0.01 || num > 999999.99) {
-                      setErrors(prev => ({ ...prev, minPurchaseAmount: "Minimum purchase amount must be between 0.01 and 999,999.99" }));
+                      setErrors((prev) => ({
+                        ...prev,
+                        minPurchaseAmount:
+                          "Minimum purchase amount must be between 0.01 and 999,999.99",
+                      }));
                     }
                   }
                 }}
                 placeholder="Enter Value (e.g., 50.00)"
                 className={`w-full h-8 border rounded-lg px-3 text-[13px] leading-none focus:outline-none bg-[#fdfdfd] ${
-                  errors.minPurchaseAmount ? "border-red-500" : "border-[#8a8a8a]"
+                  errors.minPurchaseAmount
+                    ? "border-red-500"
+                    : "border-[#8a8a8a]"
                 }`}
               />
               {errors.minPurchaseAmount ? (
-                <p className="text-xs text-red-500 mt-1">{errors.minPurchaseAmount}</p>
+                <p className="text-xs text-red-500 mt-1">
+                  {errors.minPurchaseAmount}
+                </p>
               ) : (
                 <p className="text-xs text-gray-500 mt-1">
                   Maximum 999,999.99 allowed
@@ -506,7 +564,9 @@ export default function FreeShippingForm({
         onTiersChange={setSelectedTiers}
         onRestrictionToggle={setCustomerRestrictionEnabled}
         error={errors.customerTierSelection}
-        onErrorClear={() => setErrors((prev) => ({ ...prev, customerTierSelection: undefined }))}
+        onErrorClear={() =>
+          setErrors((prev) => ({ ...prev, customerTierSelection: undefined }))
+        }
       />
 
       <div className="flex items-center justify-end mt-4">
@@ -522,4 +582,3 @@ export default function FreeShippingForm({
     </div>
   );
 }
-

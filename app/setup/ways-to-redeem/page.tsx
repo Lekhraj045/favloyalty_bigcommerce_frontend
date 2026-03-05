@@ -105,7 +105,8 @@ export default function WaysToRedeem() {
     ) {
       // Check if any premium coupons are enabled and disable them
       const premiumCoupons = redeemCoupons.filter(
-        (coupon) => coupon.redeemType !== "storeCredit" && coupon.coupon?.active
+        (coupon) =>
+          coupon.redeemType !== "storeCredit" && coupon.coupon?.active,
       );
 
       if (premiumCoupons.length > 0) {
@@ -272,7 +273,7 @@ export default function WaysToRedeem() {
     } else if (selectedKeys instanceof Set) {
       // Delete selected coupons
       const selectedCouponIds = Array.from(selectedKeys).filter(
-        (id): id is string => typeof id === "string"
+        (id): id is string => typeof id === "string",
       );
 
       if (selectedCouponIds.length === 0) {
@@ -283,7 +284,7 @@ export default function WaysToRedeem() {
       setDeletingBulk(true);
       try {
         const deletePromises = selectedCouponIds.map((id) =>
-          deleteRedeemCoupon(id)
+          deleteRedeemCoupon(id),
         );
         await Promise.all(deletePromises);
 
@@ -329,7 +330,7 @@ export default function WaysToRedeem() {
         if (!coupon._id || !coupon.coupon) return false;
 
         const originalCoupon = originalCoupons.find(
-          (oc) => oc._id === coupon._id
+          (oc) => oc._id === coupon._id,
         );
         if (!originalCoupon || !originalCoupon.coupon) return false;
 
@@ -342,7 +343,7 @@ export default function WaysToRedeem() {
         const savePromises = changedCoupons.map(async (coupon) => {
           return toggleCouponStatus(
             coupon._id!,
-            coupon.coupon!.active || false
+            coupon.coupon!.active || false,
           );
         });
 
@@ -367,7 +368,7 @@ export default function WaysToRedeem() {
             await updatePageCompletionStatus(
               channelId,
               "waysToRedeem",
-              isPageCompleted
+              isPageCompleted,
             );
             // Update Redux store to reflect the new completion status
             dispatch(
@@ -375,7 +376,7 @@ export default function WaysToRedeem() {
                 channelId: channelId,
                 pageType: "waysToRedeem",
                 completed: isPageCompleted,
-              })
+              }),
             );
           } catch (error) {
             console.error("Error updating page completion status:", error);

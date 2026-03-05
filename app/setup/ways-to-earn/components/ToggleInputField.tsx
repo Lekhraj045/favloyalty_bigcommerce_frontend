@@ -38,7 +38,7 @@ export default function ToggleInputField({
     if (enabled) {
       const pointsValue =
         inputType === "float" ? parseFloat(points) || 0 : parseInt(points) || 0;
-      setHasError(pointsValue === 0);
+      setHasError(pointsValue < (inputType === "float" ? 0.1 : 1));
     } else {
       setHasError(false);
     }
@@ -58,7 +58,7 @@ export default function ToggleInputField({
     if (enabled) {
       const pointsValue =
         inputType === "float" ? parseFloat(points) || 0 : parseInt(points) || 0;
-      setHasError(pointsValue === 0);
+      setHasError(pointsValue < (inputType === "float" ? 0.1 : 1));
     }
   };
 
@@ -149,7 +149,9 @@ export default function ToggleInputField({
           {hasError && enabled && (
             <div className="flex items-center gap-1 text-red-500 text-xs mt-1 w-[120px]">
               <AlertCircle size={12} className="flex-shrink-0" />
-              <span>Value must be at least 1</span>
+              <span>
+                Value must be at least {inputType === "float" ? 0.1 : 1}
+              </span>
             </div>
           )}
         </div>

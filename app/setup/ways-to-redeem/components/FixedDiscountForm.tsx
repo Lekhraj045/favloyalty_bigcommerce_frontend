@@ -1,16 +1,24 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import UpgradeModal from "@/components/UpgradeModal";
+import { useAppSelector } from "@/store/hooks";
+import {
+  createRedeemCoupon,
+  getStoreId,
+  getStorePlan,
+  StorePlan,
+  updateRedeemCoupon,
+  type CreateRedeemCouponData,
+  type RedeemCoupon,
+} from "@/utils/api";
 import { Button } from "@heroui/button";
 import { Switch } from "@heroui/switch";
-import { ArrowLeft } from "lucide-react";
-import { useAppSelector } from "@/store/hooks";
-import { getStoreId, getStorePlan, StorePlan } from "@/utils/api";
-import { createRedeemCoupon, updateRedeemCoupon, type CreateRedeemCouponData, type RedeemCoupon } from "@/utils/api";
 import { addToast } from "@heroui/toast";
-import UpgradeModal from "@/components/UpgradeModal";
-import CustomerTierSelection from "./CustomerTierSelection";
+import { ArrowLeft } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { getCurrencyIcon } from "../../ways-to-earn/utils";
 import { validateTiers } from "../utils/tierValidation";
+import CustomerTierSelection from "./CustomerTierSelection";
 
 interface FixedDiscountFormProps {
   onBack: () => void;
@@ -24,7 +32,7 @@ export default function FixedDiscountForm({
   coupon,
 }: FixedDiscountFormProps) {
   const selectedChannel = useAppSelector(
-    (state) => state.channel.selectedChannel
+    (state) => state.channel.selectedChannel,
   );
   const storeId = getStoreId();
   const channelId = selectedChannel?.id || null;
@@ -34,19 +42,24 @@ export default function FixedDiscountForm({
   const [expireCoupon, setExpireCoupon] = useState<string>("");
   const [maxPointsEnabled, setMaxPointsEnabled] = useState<boolean>(false); // OFF by default
   const [maxPoints, setMaxPoints] = useState<string>("1");
-  const [selectedTiers, setSelectedTiers] = useState<Array<{
-    status: boolean;
-    name: string;
-    tierId: string;
-    tierIndex: number;
-  }>>([]);
-  const [customerRestrictionEnabled, setCustomerRestrictionEnabled] = useState<boolean>(true); // true = disabled (no restriction)
+  const [selectedTiers, setSelectedTiers] = useState<
+    Array<{
+      status: boolean;
+      name: string;
+      tierId: string;
+      tierIndex: number;
+    }>
+  >([]);
+  const [customerRestrictionEnabled, setCustomerRestrictionEnabled] =
+    useState<boolean>(true); // true = disabled (no restriction)
   const [loading, setLoading] = useState(false);
 
   // Plan and upgrade modal state
   const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
   const hasDisabledMaxPointsRef = useRef<boolean>(false);
+  const storeCurrency =
+    useAppSelector((state) => state.channel.storeCurrency) || "USD";
 
   // Helper function to check if user is on free plan or order limit reached
   const isFreePlan = () => {
@@ -75,7 +88,14 @@ export default function FixedDiscountForm({
       } catch (error) {
         console.error("Error loading store plan:", error);
         // Default to free plan if error
-        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null, limitReached: false, orderCount: 0, selectedOrderLimit: 0 });
+        setStorePlan({
+          plan: "free",
+          trialDaysRemaining: null,
+          paypalSubscriptionId: null,
+          limitReached: false,
+          orderCount: 0,
+          selectedOrderLimit: 0,
+        });
       }
     };
     loadStorePlan();
@@ -99,7 +119,7 @@ export default function FixedDiscountForm({
     if (coupon && coupon.coupon) {
       // Pre-populate form fields with existing coupon data
       setPoints(coupon.coupon.value?.toString() || "");
-      
+
       // Handle expiry - convert days to string if hasExpiry is true
       if (coupon.coupon.hasExpiry && coupon.coupon.expire) {
         setExpireCoupon(coupon.coupon.expire.toString());
@@ -153,20 +173,20 @@ export default function FixedDiscountForm({
   const handlePointsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     // Remove any decimal points and non-numeric characters except empty string
-    let wholeNumber = value.replace(/[^\d]/g, '');
-    
+    let wholeNumber = value.replace(/[^\d]/g, "");
+
     // Enforce maximum value of 100000
     if (wholeNumber && parseInt(wholeNumber) > 100000) {
-      wholeNumber = '100000';
+      wholeNumber = "100000";
     }
-    
+
     setPoints(wholeNumber);
-    
+
     // Clear error if value is now valid
     if (errors.points && wholeNumber) {
       const num = parseInt(wholeNumber);
       if (!isNaN(num) && num >= 1 && num <= 100000) {
-        setErrors(prev => ({ ...prev, points: undefined }));
+        setErrors((prev) => ({ ...prev, points: undefined }));
       }
     }
   };
@@ -174,20 +194,20 @@ export default function FixedDiscountForm({
   const handleExpireCouponChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     // Remove any decimal points and non-numeric characters except empty string
-    let wholeNumber = value.replace(/[^\d]/g, '');
-    
+    let wholeNumber = value.replace(/[^\d]/g, "");
+
     // Enforce maximum value of 365
     if (wholeNumber && parseInt(wholeNumber) > 365) {
-      wholeNumber = '365';
+      wholeNumber = "365";
     }
-    
+
     setExpireCoupon(wholeNumber);
-    
+
     // Clear error if value is now valid
     if (errors.expireCoupon && wholeNumber) {
       const num = parseInt(wholeNumber);
       if (!isNaN(num) && num >= 1 && num <= 365) {
-        setErrors(prev => ({ ...prev, expireCoupon: undefined }));
+        setErrors((prev) => ({ ...prev, expireCoupon: undefined }));
       }
     }
   };
@@ -195,20 +215,20 @@ export default function FixedDiscountForm({
   const handleMaxPointsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     // Remove any decimal points and non-numeric characters except empty string
-    let wholeNumber = value.replace(/[^\d]/g, '');
-    
+    let wholeNumber = value.replace(/[^\d]/g, "");
+
     // Enforce maximum value of 100000
     if (wholeNumber && parseInt(wholeNumber) > 100000) {
-      wholeNumber = '100000';
+      wholeNumber = "100000";
     }
-    
+
     setMaxPoints(wholeNumber);
-    
+
     // Clear error if value is now valid
     if (errors.maxPoints && wholeNumber) {
       const num = parseInt(wholeNumber);
       if (!isNaN(num) && num >= 1 && num <= 100000) {
-        setErrors(prev => ({ ...prev, maxPoints: undefined }));
+        setErrors((prev) => ({ ...prev, maxPoints: undefined }));
       }
     }
   };
@@ -219,22 +239,30 @@ export default function FixedDiscountForm({
     // Validate points (1-100,000) - only whole numbers
     const pointsNum = parseInt(points);
     if (!points || isNaN(pointsNum) || pointsNum < 1 || pointsNum > 100000) {
-      newErrors.points = "Points must be between 1 and 1,00,000 (whole numbers only)";
+      newErrors.points =
+        "Points must be between 1 and 1,00,000 (whole numbers only)";
     }
 
     // Validate expireCoupon (optional, but if provided must be 1-365) - only whole numbers
     if (expireCoupon.trim() !== "") {
       const expireNum = parseInt(expireCoupon);
       if (isNaN(expireNum) || expireNum < 1 || expireNum > 365) {
-        newErrors.expireCoupon = "Expiry days must be between 1 and 365 (whole numbers only)";
+        newErrors.expireCoupon =
+          "Expiry days must be between 1 and 365 (whole numbers only)";
       }
     }
 
     // Validate maxPoints if enabled and not free plan
     if (maxPointsEnabled && !isFreePlan()) {
       const maxPointsNum = parseInt(maxPoints);
-      if (!maxPoints || isNaN(maxPointsNum) || maxPointsNum < 1 || maxPointsNum > 100000) {
-        newErrors.maxPoints = "Maximum points must be between 1 and 1,00,000 (whole numbers only)";
+      if (
+        !maxPoints ||
+        isNaN(maxPointsNum) ||
+        maxPointsNum < 1 ||
+        maxPointsNum > 100000
+      ) {
+        newErrors.maxPoints =
+          "Maximum points must be between 1 and 1,00,000 (whole numbers only)";
       }
     }
 
@@ -242,7 +270,9 @@ export default function FixedDiscountForm({
     // customerRestrictionEnabled: true = disabled (no restriction), false = enabled (restriction ON)
     if (!customerRestrictionEnabled) {
       // Restriction is enabled, check if at least one tier is selected
-      const hasSelectedTier = selectedTiers.some((tier) => tier.status === true);
+      const hasSelectedTier = selectedTiers.some(
+        (tier) => tier.status === true,
+      );
       if (!hasSelectedTier) {
         newErrors.customerTierSelection =
           "Please select at least one customer tier or disable the customer restriction";
@@ -297,22 +327,28 @@ export default function FixedDiscountForm({
         onlineStoreDashBoardDisable: false,
         // For free users, always disable max points redemption
         redemptionLimitDisable: !maxPointsEnabled || isFreePlan(), // false = enabled, true = disabled
-        redemptionLimit: (maxPointsEnabled && !isFreePlan()) ? parseInt(maxPoints) : 0,
+        redemptionLimit:
+          maxPointsEnabled && !isFreePlan() ? parseInt(maxPoints) : 0,
         minimumnPurchaseAmountDisable: true,
       };
 
       let result;
       if (isEditMode && coupon?._id) {
         // Update existing coupon
-        result = await updateRedeemCoupon(coupon._id, storeId, channelId, couponData);
-        
+        result = await updateRedeemCoupon(
+          coupon._id,
+          storeId,
+          channelId,
+          couponData,
+        );
+
         if (result.success) {
           addToast({
             title: "Success",
             description: "Fixed discount coupon updated successfully",
             color: "success",
           });
-          
+
           // Call success callback or go back
           if (onSuccess) {
             onSuccess();
@@ -323,14 +359,14 @@ export default function FixedDiscountForm({
       } else {
         // Create new coupon
         result = await createRedeemCoupon(storeId, channelId, couponData);
-        
+
         if (result.success) {
           addToast({
             title: "Success",
             description: "Fixed discount coupon created successfully",
             color: "success",
           });
-          
+
           // Reset form
           setPoints("");
           setExpireCoupon("");
@@ -338,7 +374,7 @@ export default function FixedDiscountForm({
           setMaxPoints("1");
           setCustomerRestrictionEnabled(true);
           setSelectedTiers([]);
-          
+
           // Call success callback or go back
           if (onSuccess) {
             onSuccess();
@@ -371,7 +407,9 @@ export default function FixedDiscountForm({
             <ArrowLeft size={20} color="#000000" strokeWidth={2} />
           </button>
           <h2 className="text-base font-bold">
-            {isEditMode ? "Edit Fixed Discount Coupon" : "Create Fixed Discount Coupon"}
+            {isEditMode
+              ? "Edit Fixed Discount Coupon"
+              : "Create Fixed Discount Coupon"}
           </h2>
         </div>
 
@@ -383,7 +421,7 @@ export default function FixedDiscountForm({
             <input
               type="text"
               disabled
-              value="₹ 1"
+              value={getCurrencyIcon(storeCurrency || "USD") + " 1"}
               className="w-full h-8 border border-[#8a8a8a] rounded-lg px-3 text-[13px] leading-none focus:outline-none bg-[#fdfdfd]"
             />
           </div>
@@ -413,7 +451,10 @@ export default function FixedDiscountForm({
                   return;
                 }
                 // Ensure that it is a number and stop the keypress
-                if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                if (
+                  (e.shiftKey || e.keyCode < 48 || e.keyCode > 57) &&
+                  (e.keyCode < 96 || e.keyCode > 105)
+                ) {
                   e.preventDefault();
                 }
               }}
@@ -422,7 +463,11 @@ export default function FixedDiscountForm({
                 if (points) {
                   const num = parseInt(points);
                   if (isNaN(num) || num < 1 || num > 100000) {
-                    setErrors(prev => ({ ...prev, points: "Points must be between 1 and 1,00,000 (whole numbers only)" }));
+                    setErrors((prev) => ({
+                      ...prev,
+                      points:
+                        "Points must be between 1 and 1,00,000 (whole numbers only)",
+                    }));
                   }
                 }
               }}
@@ -432,10 +477,11 @@ export default function FixedDiscountForm({
               }`}
             />
             {errors.points ? (
-              <p className="text-xs text-red-500 mt-1">{errors.points}</p>
+              <span className="text-xs text-red-500 mt-1">{errors.points}</span>
             ) : (
               <p className="text-xs text-gray-500 mt-1">
-                Please enter the number of points required for every INR 1 discount.
+                Please enter the number of points required for every{" "}
+                {storeCurrency || "USD"} 1 discount.
               </p>
             )}
           </div>
@@ -465,7 +511,10 @@ export default function FixedDiscountForm({
                   return;
                 }
                 // Ensure that it is a number and stop the keypress
-                if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                if (
+                  (e.shiftKey || e.keyCode < 48 || e.keyCode > 57) &&
+                  (e.keyCode < 96 || e.keyCode > 105)
+                ) {
                   e.preventDefault();
                 }
               }}
@@ -474,7 +523,11 @@ export default function FixedDiscountForm({
                 if (expireCoupon.trim()) {
                   const num = parseInt(expireCoupon);
                   if (isNaN(num) || num < 1 || num > 365) {
-                    setErrors(prev => ({ ...prev, expireCoupon: "Expiry days must be between 1 and 365 (whole numbers only)" }));
+                    setErrors((prev) => ({
+                      ...prev,
+                      expireCoupon:
+                        "Expiry days must be between 1 and 365 (whole numbers only)",
+                    }));
                   }
                 }
               }}
@@ -484,7 +537,9 @@ export default function FixedDiscountForm({
               }`}
             />
             {errors.expireCoupon ? (
-              <p className="text-xs text-red-500 mt-1">{errors.expireCoupon}</p>
+              <span className="text-xs text-red-500 mt-1">
+                {errors.expireCoupon}
+              </span>
             ) : (
               <p className="text-xs text-gray-500 mt-1">
                 Leave empty for no expiry, or enter days (max 365 days)
@@ -570,7 +625,10 @@ export default function FixedDiscountForm({
                     return;
                   }
                   // Ensure that it is a number and stop the keypress
-                  if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                  if (
+                    (e.shiftKey || e.keyCode < 48 || e.keyCode > 57) &&
+                    (e.keyCode < 96 || e.keyCode > 105)
+                  ) {
                     e.preventDefault();
                   }
                 }}
@@ -579,7 +637,11 @@ export default function FixedDiscountForm({
                   if (maxPointsEnabled && maxPoints) {
                     const num = parseInt(maxPoints);
                     if (isNaN(num) || num < 1 || num > 100000) {
-                      setErrors(prev => ({ ...prev, maxPoints: "Maximum points must be between 1 and 1,00,000 (whole numbers only)" }));
+                      setErrors((prev) => ({
+                        ...prev,
+                        maxPoints:
+                          "Maximum points must be between 1 and 1,00,000 (whole numbers only)",
+                      }));
                     }
                   }
                 }}
@@ -589,7 +651,9 @@ export default function FixedDiscountForm({
                 }`}
               />
               {errors.maxPoints ? (
-                <p className="text-xs text-red-500 mt-1">{errors.maxPoints}</p>
+                <span className="text-xs text-red-500 mt-1">
+                  {errors.maxPoints}
+                </span>
               ) : (
                 <p className="text-xs text-gray-500 mt-1">
                   Enter a value between 1 and 100000.
@@ -607,7 +671,9 @@ export default function FixedDiscountForm({
         onTiersChange={setSelectedTiers}
         onRestrictionToggle={setCustomerRestrictionEnabled}
         error={errors.customerTierSelection}
-        onErrorClear={() => setErrors((prev) => ({ ...prev, customerTierSelection: undefined }))}
+        onErrorClear={() =>
+          setErrors((prev) => ({ ...prev, customerTierSelection: undefined }))
+        }
       />
 
       <div className="flex items-center justify-end mt-4">
@@ -630,4 +696,3 @@ export default function FixedDiscountForm({
     </div>
   );
 }
-

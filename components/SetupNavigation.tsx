@@ -1,10 +1,10 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
-import { CircleCheck, Scan } from "lucide-react";
 import { useAppSelector } from "@/store/hooks";
-import { useEffect, useState } from "react";
 import type { Channel } from "@/utils/api";
+import { CircleCheck, Scan } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface SetupNavigationProps {
   onNavigate?: (route: string) => void;
@@ -14,9 +14,9 @@ export default function SetupNavigation({ onNavigate }: SetupNavigationProps) {
   const router = useRouter();
   const pathname = usePathname();
   const reduxSelectedChannel = useAppSelector(
-    (state) => state.channel.selectedChannel
+    (state) => state.channel.selectedChannel,
   );
-  
+
   // Initialize from localStorage immediately (synchronous) to avoid delay on page reload
   const getInitialChannel = (): Channel | null => {
     if (typeof window === "undefined") return null;
@@ -35,7 +35,7 @@ export default function SetupNavigation({ onNavigate }: SetupNavigationProps) {
   };
 
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(
-    getInitialChannel
+    getInitialChannel,
   );
 
   useEffect(() => {
@@ -57,6 +57,7 @@ export default function SetupNavigation({ onNavigate }: SetupNavigationProps) {
   }, [reduxSelectedChannel]);
 
   const handleNavigation = (route: string) => {
+    if (pathname === route) return; // Prevent navigation if already on the route
     if (onNavigate) {
       onNavigate(route);
     } else {
@@ -94,7 +95,8 @@ export default function SetupNavigation({ onNavigate }: SetupNavigationProps) {
           {steps.map((step) => {
             const isActive =
               pathname === step.route ||
-              (pathname === "/" && step.route === "/setup/points-tier-system");
+              (pathname === "/setup" &&
+                step.route === "/setup/points-tier-system");
 
             return (
               <button
@@ -113,7 +115,7 @@ export default function SetupNavigation({ onNavigate }: SetupNavigationProps) {
           })}
         </div>
 
-        <button 
+        <button
           onClick={() => handleNavigation("/email")}
           className="custom-btn cursor-pointer"
         >

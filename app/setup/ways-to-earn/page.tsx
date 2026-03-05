@@ -32,7 +32,8 @@ export default function WaysToEarn() {
   const selectedChannel = useAppSelector(
     (state) => state.channel.selectedChannel,
   );
-  const everyPurchaseLabel = selectedChannel?.default_currency ?? "INR";
+  const storeCurrency = useAppSelector((state) => state.channel.storeCurrency);
+  const everyPurchaseLabel = storeCurrency ?? "USD";
   const [savedEvents, setSavedEvents] = useState<Event[]>([]);
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveAndNextLoading, setSaveAndNextLoading] = useState(false);
@@ -160,7 +161,7 @@ export default function WaysToEarn() {
     }
     if (
       settings.everyPurchase.enabled &&
-      (parseFloat(settings.everyPurchase.points) || 0) === 0
+      (parseFloat(settings.everyPurchase.points) || 0) < 0.1
     ) {
       validationErrors.push(`Every purchase (Per ${everyPurchaseLabel} spent)`);
     }
@@ -198,7 +199,7 @@ export default function WaysToEarn() {
     if (validationErrors.length > 0) {
       addToast({
         title: "Validation Error",
-        description: `Please set points greater than 0 for the following enabled options: ${validationErrors.join(", ")}`,
+        description: `Please set points greater than minimum value for the following enabled options: ${validationErrors.join(", ")}`,
         color: "danger",
       });
       return;

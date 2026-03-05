@@ -6,15 +6,20 @@ import {
   updateChannelAfterReset,
   updateChannelWidgetVisibility,
 } from "@/store/slices/channelSlice";
-import { resetChannelSettingsApi, updateWidgetVisibilityApi } from "@/utils/api";
+import {
+  resetChannelSettingsApi,
+  updateWidgetVisibilityApi,
+} from "@/utils/api";
 import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
-import { useState } from "react";
+import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import DashLayout from "./components/dash-layout";
 import ResetSettingsModal from "./components/ResetSettingsModal";
-import SetupBar from "./components/setup-bar";
 import WhyWidgetDisable from "./components/why-widget-disbale";
+
+const SetupBar = dynamic(() => import("./components/setup-bar"), { ssr: false });
 
 export default function DashboardPage() {
   const dispatch = useDispatch();
@@ -25,6 +30,11 @@ export default function DashboardPage() {
   const [widgetToggleLoading, setWidgetToggleLoading] = useState(false);
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Show the card when setupprogress is null, undefined, or less than 4
   const shouldShowWidgetDisabledCard =
@@ -35,6 +45,8 @@ export default function DashboardPage() {
     !!selectedChannel &&
     (selectedChannel.setupprogress || 0) === 4 &&
     selectedChannel.widget_visibility !== false;
+
+  const effectiveWidgetEnabled = mounted ? isWidgetEnabled : false;
 
   const handleToggleWidgetVisibility = async () => {
     if (!selectedChannel?.id) {
@@ -137,10 +149,10 @@ export default function DashboardPage() {
 
             <div className="flex gap-2.5 items-center">
               <div
-                className={`relative pl-6 ${isWidgetEnabled ? "online-widget" : "offline-widget"}`}
+                className={`relative pl-6 ${effectiveWidgetEnabled ? "online-widget" : "offline-widget"}`}
               >
                 <p className="font-bold">
-                  {isWidgetEnabled
+                  {effectiveWidgetEnabled
                     ? "Loyalty program active"
                     : "Loyalty program not active"}
                 </p>
@@ -149,15 +161,15 @@ export default function DashboardPage() {
               <Button
                 className="custom-btn"
                 onPress={handleToggleWidgetVisibility}
-                isDisabled={widgetToggleLoading || !selectedChannel?.id}
+                isDisabled={!mounted || widgetToggleLoading || !selectedChannel?.id}
                 isLoading={widgetToggleLoading}
               >
-                {isWidgetEnabled ? "Disable Widget" : "Enable Widget"}
+                {effectiveWidgetEnabled ? "Disable Widget" : "Enable Widget"}
               </Button>
               <Button
                 className="custom-btn danger-btn"
                 onPress={() => setResetModalOpen(true)}
-                isDisabled={!selectedChannel?.id}
+                isDisabled={!mounted || !selectedChannel?.id}
               >
                 Reset Settings
               </Button>

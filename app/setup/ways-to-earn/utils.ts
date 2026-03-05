@@ -116,3 +116,15 @@ export const convertEventToFormData = (event: Event): EventFormData => {
     points: String(event.point),
   };
 };
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$",
+  INR: "₹",
+  EUR: "€",
+  GBP: "£",
+};
+
+export function getCurrencyIcon(currencyCode: string): string {
+  const normalized = (currencyCode ?? "").toUpperCase().trim();
+  return (CURRENCY_SYMBOLS[normalized] ?? currencyCode) || "₹";
+}

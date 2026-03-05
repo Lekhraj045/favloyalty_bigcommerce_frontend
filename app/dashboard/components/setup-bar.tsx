@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import SetupNavigation from "@/components/SetupNavigation";
 import { CheckBadgeIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { Button } from "@heroui/button";
@@ -41,9 +42,14 @@ function SetupStep({ label, completed, route }: SetupStepProps) {
 
 export default function SetupBar() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const selectedChannel = useAppSelector(
     (state) => state.channel.selectedChannel
   );
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Get completion status from channel, default to false if not available
   const pointsTierSystemCompleted =
@@ -56,9 +62,38 @@ export default function SetupBar() {
   // Email is always complete
   const emailCompleted = true;
 
+  // Use Redux-derived completion only after mount so server and first client render match
+  const effectivePoints = mounted ? pointsTierSystemCompleted : false;
+  const effectiveWaysToEarn = mounted ? waysToEarnCompleted : false;
+  const effectiveWaysToRedeem = mounted ? waysToRedeemCompleted : false;
+  const effectiveCustomise = mounted ? customiseWidgetCompleted : false;
+
   const handleEditSetup = () => {
     router.push("/setup/points-tier-system");
   };
+
+  // Avoid hydration mismatch: render static shell until client has mounted, then show real steps
+  if (!mounted) {
+    return (
+      <div className="dashboardbox setup-bar">
+        <div className="card">
+          <div className="flex items-center gap-2">
+            <div className="flex gap-4 items-center w-full">
+              <div className="flex gap-4 grow">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div
+                    key={i}
+                    className="h-[46px] flex-1 rounded-lg border border-gray-200 bg-gray-50 animate-pulse"
+                  />
+                ))}
+              </div>
+              <div className="h-10 w-24 rounded-lg bg-gray-100 animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboardbox setup-bar">
@@ -68,25 +103,25 @@ export default function SetupBar() {
             <div className="flex gap-4 grow">
               <SetupStep
                 label="Point"
-                completed={pointsTierSystemCompleted}
+                completed={effectivePoints}
                 route="/setup/points-tier-system"
               />
 
               <SetupStep 
                 label="Earn" 
-                completed={waysToEarnCompleted}
+                completed={effectiveWaysToEarn}
                 route="/setup/ways-to-earn"
               />
 
               <SetupStep 
                 label="Redeem" 
-                completed={waysToRedeemCompleted}
+                completed={effectiveWaysToRedeem}
                 route="/setup/ways-to-redeem"
               />
 
               <SetupStep 
                 label="Design" 
-                completed={customiseWidgetCompleted}
+                completed={effectiveCustomise}
                 route="/setup/customise-widget"
               />
 

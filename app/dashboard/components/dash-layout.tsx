@@ -58,12 +58,14 @@ export default function DashLayout() {
     PointsAwardedStat[]
   >([]);
   const [totalPointsAwarded, setTotalPointsAwarded] = useState(0);
+  const [equivalentPointsAwarded, setEquivalentPointsAwarded] = useState(0);
   const [pointsLoading, setPointsLoading] = useState(false);
   const [pointsRedeemedStats, setPointsRedeemedStats] = useState<
     PointsRedeemedStat[]
   >([]);
   const [totalPointsRedeemed, setTotalPointsRedeemed] = useState(0);
   const [pointsRedeemedLoading, setPointsRedeemedLoading] = useState(false);
+  const storeCurrency = useAppSelector((state) => state.channel.storeCurrency);
 
   const today = new Date();
   today.setHours(23, 59, 59, 999); // Set to end of today
@@ -154,7 +156,8 @@ export default function DashLayout() {
       allCustomers.forEach((customer) => {
         const tierIndex = customer.currentTier?.tierIndex ?? 0;
         const isNew = filteredNewCustomers.some(
-          (c) => c.id === customer.id || c.bcCustomerId === customer.bcCustomerId,
+          (c) =>
+            c.id === customer.id || c.bcCustomerId === customer.bcCustomerId,
         );
         addToCount(tierIndex, isNew);
       });
@@ -172,6 +175,7 @@ export default function DashLayout() {
     if (!selectedChannel?.id || !dateRange.start || !dateRange.end) {
       setPointsAwardedStats([]);
       setTotalPointsAwarded(0);
+      setEquivalentPointsAwarded(0);
       return;
     }
 
@@ -201,11 +205,13 @@ export default function DashLayout() {
       if (response.success && response.data) {
         setPointsAwardedStats(response.data.stats);
         setTotalPointsAwarded(response.data.totalPointsAwarded);
+        setEquivalentPointsAwarded(response.data.totalPointsAwardedEquivalent);
       }
     } catch (error) {
       console.error("Error fetching points awarded stats:", error);
       setPointsAwardedStats([]);
       setTotalPointsAwarded(0);
+      setEquivalentPointsAwarded(0);
     } finally {
       setPointsLoading(false);
     }
@@ -415,48 +421,49 @@ export default function DashLayout() {
                       </div>
                     </div>
 
-                    {pointsConfig?.tierStatus && (pointsConfig.tier?.length ?? 0) > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                      {pointsConfig.tier!.map((tier, tierIndex) => {
-                        const count = tierCounts[tierIndex] ?? {
-                          total: 0,
-                          new: 0,
-                        };
-                        return (
-                          <div key={tier._id ?? tierIndex} className="card">
-                            <div className="flex flex-col gap-2">
-                              <span className="text-sm font-bold text-[#303030]">
-                                {tier.tierName}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xl font-bold text-[#303030]">
-                                  {loading ? "..." : count.total}
+                    {pointsConfig?.tierStatus &&
+                    (pointsConfig.tier?.length ?? 0) > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {pointsConfig.tier!.map((tier, tierIndex) => {
+                          const count = tierCounts[tierIndex] ?? {
+                            total: 0,
+                            new: 0,
+                          };
+                          return (
+                            <div key={tier._id ?? tierIndex} className="card">
+                              <div className="flex flex-col gap-2">
+                                <span className="text-sm font-bold text-[#303030]">
+                                  {tier.tierName}
                                 </span>
-                                {count.new > 0 ? (
-                                  <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
-                                    <span>{count.new}</span>
-                                    <span>
-                                      <ArrowUp
-                                        strokeWidth={3}
-                                        className="w-3 h-3 text-white"
-                                      />
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <MoveHorizontal className="w-4 h-4 text-[#303030]" />
-                                )}
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xl font-bold text-[#303030]">
+                                    {loading ? "..." : count.total}
+                                  </span>
+                                  {count.new > 0 ? (
+                                    <div className="flex items-center gap-1 bg-[#219653] text-white px-2 py-0.5 rounded-full text-xs">
+                                      <span>{count.new}</span>
+                                      <span>
+                                        <ArrowUp
+                                          strokeWidth={3}
+                                          className="w-3 h-3 text-white"
+                                        />
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <MoveHorizontal className="w-4 h-4 text-[#303030]" />
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-[#666]">
-                      Tier system is disabled. Enable tiers in Points & Tier
-                      System to see tier breakdown.
-                    </p>
-                  )}
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-[#666]">
+                        Tier system is disabled. Enable tiers in Points & Tier
+                        System to see tier breakdown.
+                      </p>
+                    )}
                   </div>
 
                   {/* Points Awarded Section */}
@@ -476,7 +483,7 @@ export default function DashLayout() {
                         <span className="font-bold">
                           {pointsLoading
                             ? "..."
-                            : `${totalPointsAwarded.toLocaleString()} = Rs. ${pointsToCurrency(totalPointsAwarded).toFixed(2)}`}
+                            : `${totalPointsAwarded.toLocaleString()} = ${storeCurrency || "USD"}. ${Number(equivalentPointsAwarded).toFixed(2)}`}
                         </span>
                       </div>
                     </div>
@@ -795,7 +802,7 @@ export default function DashLayout() {
                         <span className="font-bold">
                           {pointsRedeemedLoading
                             ? "..."
-                            : `${totalPointsRedeemed.toLocaleString()} = Rs. ${pointsToCurrency(totalPointsRedeemed).toFixed(2)}`}
+                            : `${totalPointsRedeemed.toLocaleString()} = ${storeCurrency || "USD"}. ${pointsToCurrency(totalPointsRedeemed).toFixed(2)}`}
                         </span>
                       </div>
                     </div>
@@ -820,24 +827,18 @@ export default function DashLayout() {
                               {pointsRedeemedLoading
                                 ? "..."
                                 : (
-                                    getStatForRedeemed(
-                                      "Percentage Discount",
-                                    )?.totalPointsRedeemed ?? 0
+                                    getStatForRedeemed("Percentage Discount")
+                                      ?.totalPointsRedeemed ?? 0
                                   ).toLocaleString()}
                             </span>
                             {!pointsRedeemedLoading &&
-                              getStatForRedeemed(
-                                "Percentage Discount",
-                              ) &&
+                              getStatForRedeemed("Percentage Discount") &&
                               renderGrowthIndicator(
-                                getStatForRedeemed(
-                                  "Percentage Discount",
-                                )!.growth,
+                                getStatForRedeemed("Percentage Discount")!
+                                  .growth,
                               )}
                             {!pointsRedeemedLoading &&
-                              !getStatForRedeemed(
-                                "Percentage Discount",
-                              ) && (
+                              !getStatForRedeemed("Percentage Discount") && (
                                 <MoveHorizontal className="w-4 h-4 text-[#303030]" />
                               )}
                           </div>

@@ -76,7 +76,9 @@ export default function PointsSetting() {
   const [showCustomNameModal, setShowCustomNameModal] =
     useState<boolean>(false);
   const [resetTierEditing, setResetTierEditing] = useState<boolean>(false);
-  const [tierValidationErrors, setTierValidationErrors] = useState<Record<number, { pointRequired?: string; multiplier?: string }>>({});
+  const [tierValidationErrors, setTierValidationErrors] = useState<
+    Record<number, { pointRequired?: string; multiplier?: string }>
+  >({});
 
   // Plan and upgrade modal state
   const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
@@ -344,12 +346,12 @@ export default function PointsSetting() {
       for (let i = 1; i < tiers.length; i++) {
         const currentTier = tiers[i];
         const prevTier = tiers[i - 1];
-        
+
         // Check Points Required progression
         if (currentTier.pointRequired <= prevTier.pointRequired) {
           errors.pointRequired = `Tier ${i + 1} points must be greater than Tier ${i} points`;
         }
-        
+
         // Check Multiplier progression
         const currentMultiplier = currentTier.multiplier || 1;
         const prevMultiplier = prevTier.multiplier || 1;

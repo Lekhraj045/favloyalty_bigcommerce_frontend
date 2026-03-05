@@ -31,7 +31,7 @@ export default function PercentageDiscountForm({
   coupon,
 }: PercentageDiscountFormProps) {
   const selectedChannel = useAppSelector(
-    (state) => state.channel.selectedChannel
+    (state) => state.channel.selectedChannel,
   );
   const storeId = getStoreId();
   const channelId = selectedChannel?.id || null;
@@ -89,7 +89,7 @@ export default function PercentageDiscountForm({
 
         // Set restriction toggle (true = OFF, false = ON)
         setAllowCouponForProduct(
-          !(productRestrictionEnabled || collectionRestrictionEnabled)
+          !(productRestrictionEnabled || collectionRestrictionEnabled),
         );
 
         // Set restriction type
@@ -112,7 +112,7 @@ export default function PercentageDiscountForm({
               price: item.price,
               variantId: item.variantId,
               productId: item.productId,
-            })
+            }),
           );
           setSelectedItems(items);
         }
@@ -127,7 +127,7 @@ export default function PercentageDiscountForm({
                 collectionUrl: col.collectionUrl,
                 ids: col.ids,
                 pointRequired: col.pointRequired,
-              })
+              }),
             );
           setSelectedCollections(collections);
         }
@@ -204,7 +204,7 @@ export default function PercentageDiscountForm({
   };
 
   const handleDiscountAmountChange = (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const value = e.target.value;
     // Remove any decimal points and non-numeric characters except empty string
@@ -302,7 +302,9 @@ export default function PercentageDiscountForm({
     // customerRestrictionEnabled: true = disabled (no restriction), false = enabled (restriction ON)
     if (!customerRestrictionEnabled) {
       // Restriction is enabled, check if at least one tier is selected
-      const hasSelectedTier = selectedTiers.some((tier) => tier.status === true);
+      const hasSelectedTier = selectedTiers.some(
+        (tier) => tier.status === true,
+      );
       if (!hasSelectedTier) {
         newErrors.customerTierSelection =
           "Please select at least one customer tier or disable the customer restriction";
@@ -366,7 +368,7 @@ export default function PercentageDiscountForm({
           coupon._id,
           storeId,
           channelId,
-          couponData
+          couponData,
         );
 
         if (result.success) {
@@ -495,7 +497,9 @@ export default function PercentageDiscountForm({
                 }`}
               />
               {errors.pointValue && (
-                <p className="text-xs text-red-500 mt-1">{errors.pointValue}</p>
+                <span className="text-xs text-red-500 mt-1">
+                  {errors.pointValue}
+                </span>
               )}
             </div>
             <div className="text-base text-[#303030] pb-1.5">=</div>
@@ -550,9 +554,9 @@ export default function PercentageDiscountForm({
                 }`}
               />
               {errors.discountAmount && (
-                <p className="text-xs text-red-500 mt-1">
+                <span className="text-xs text-red-500 mt-1">
                   {errors.discountAmount}
-                </p>
+                </span>
               )}
             </div>
           </div>
@@ -608,7 +612,9 @@ export default function PercentageDiscountForm({
               }`}
             />
             {errors.expireCoupon ? (
-              <p className="text-xs text-red-500 mt-1">{errors.expireCoupon}</p>
+              <span className="text-xs text-red-500 mt-1">
+                {errors.expireCoupon}
+              </span>
             ) : (
               <p className="text-xs text-gray-500 mt-1">
                 Leave empty for no expiry, or enter days (max 365 days)
@@ -619,7 +625,9 @@ export default function PercentageDiscountForm({
       </div>
 
       {/* Bottom Section: Product Selection */}
-      <div className={`card !p-0 ${errors.productSelection ? "border border-red-500" : ""}`}>
+      <div
+        className={`card !p-0 ${errors.productSelection ? "border border-red-500" : ""}`}
+      >
         <div className="flex justify-between items-center gap-6 p-4 border-b border-[#DEDEDE]">
           <div className="flex flex-col">
             <span className="text-base font-bold">
@@ -648,128 +656,59 @@ export default function PercentageDiscountForm({
 
         {!allowCouponForProduct && (
           <div className="p-4 flex flex-col gap-4">
-            <h3 className="text-sm font-bold">Add Products/Collections</h3>
+            <h3 className="text-sm font-bold">Add Products</h3>
             <p className="text-xs text-gray-500">
               Only products visible on the selected channel&apos;s storefront
               are shown, so customers can find and buy them.
             </p>
 
-            <div className="flex gap-3">
-              <div className="flex-1 max-w-[120px]">
-                <div className="w-full custom-dropi dropi-withoutLabel relative">
-                  <select
-                    value={currentRestrictionType}
-                    onChange={(e) =>
-                      setCurrentRestrictionType(
-                        e.target.value as "product" | "collection"
-                      )
-                    }
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="product">Product</option>
-                    <option value="collection">Collection</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex-1">
-                {currentRestrictionType === "product" ? (
-                  <ProductSearchDropdown
-                    type="product"
-                    onSelectProduct={(product: BigCommerceProduct) => {
-                      // Convert BigCommerce product to selectedItems format
-                      const newItem = {
-                        value: product.name,
-                        type: "product",
-                        src: product.imageUrl || "",
-                        pointRequired: "0", // Will be calculated based on coupon settings
-                        productUrl: product.url || "",
-                        ids: product.id.toString(),
-                        price: product.price || "0.00",
-                        variantId: "", // Variant ID not available from product list
-                        productId: product.id.toString(),
-                      };
-                      setSelectedItems([...selectedItems, newItem]);
-                      // Clear product selection error when a product is added
-                      if (errors.productSelection) {
-                        setErrors((prev) => ({ ...prev, productSelection: undefined }));
-                      }
-                    }}
-                    selectedProducts={selectedItems.map((item) => ({
-                      id: parseInt(item.ids || "0"),
-                      name: item.value,
-                      sku: "",
-                      price: item.price || "0.00",
-                      description: "",
-                      imageUrl: item.src,
-                      url: item.productUrl || "",
-                      isVisible: true,
-                      type: "physical",
-                    }))}
-                  />
-                ) : (
-                  <ProductSearchDropdown
-                    type="collection"
-                    onSelectProduct={(product: BigCommerceProduct) => {
-                      // For collections, we'll handle this differently
-                      // For now, treat it as a product
-                      const newItem = {
-                        value: product.name,
-                        src: product.imageUrl || "",
-                        collectionUrl: product.url || "",
-                        ids: product.id.toString(),
-                        pointRequired: "0",
-                      };
-                      setSelectedCollections([...selectedCollections, newItem]);
-                      // Clear product selection error when a collection is added
-                      if (errors.productSelection) {
-                        setErrors((prev) => ({ ...prev, productSelection: undefined }));
-                      }
-                    }}
-                    selectedProducts={selectedCollections.map((item) => ({
-                      id: parseInt(item.ids || "0"),
-                      name: item.value,
-                      sku: "",
-                      price: "0.00",
-                      description: "",
-                      imageUrl: item.src,
-                      url: item.collectionUrl || "",
-                      isVisible: true,
-                      type: "physical",
-                    }))}
-                  />
-                )}
-              </div>
-            </div>
+            <ProductSearchDropdown
+              type="product"
+              onSelectProduct={(product: BigCommerceProduct) => {
+                // Convert BigCommerce product to selectedItems format
+                const newItem = {
+                  value: product.name,
+                  type: "product",
+                  src: product.imageUrl || "",
+                  pointRequired: "0", // Will be calculated based on coupon settings
+                  productUrl: product.url || "",
+                  ids: product.id.toString(),
+                  price: product.price || "0.00",
+                  variantId: "", // Variant ID not available from product list
+                  productId: product.id.toString(),
+                };
+                setSelectedItems([...selectedItems, newItem]);
+                // Clear product selection error when a product is added
+                if (errors.productSelection) {
+                  setErrors((prev) => ({
+                    ...prev,
+                    productSelection: undefined,
+                  }));
+                }
+              }}
+              selectedProducts={selectedItems.map((item) => ({
+                id: parseInt(item.ids || "0"),
+                name: item.value,
+                sku: "",
+                price: item.price || "0.00",
+                description: "",
+                imageUrl: item.src,
+                url: item.productUrl || "",
+                isVisible: true,
+                type: "physical",
+              }))}
+            />
 
             {/* Product Table */}
-            {currentRestrictionType === "product" ? (
-              <ProductTable
-                items={selectedItems}
-                onRemove={(index) => {
-                  const newItems = [...selectedItems];
-                  newItems.splice(index, 1);
-                  setSelectedItems(newItems);
-                }}
-                type="product"
-              />
-            ) : (
-              <ProductTable
-                items={selectedCollections.map((col) => ({
-                  value: col.value,
-                  type: "collection",
-                  src: col.src,
-                  productUrl: col.collectionUrl,
-                  ids: col.ids,
-                }))}
-                onRemove={(index) => {
-                  const newCollections = [...selectedCollections];
-                  newCollections.splice(index, 1);
-                  setSelectedCollections(newCollections);
-                }}
-                type="collection"
-              />
-            )}
+            <ProductTable
+              items={selectedItems}
+              onRemove={(index) => {
+                const newItems = [...selectedItems];
+                newItems.splice(index, 1);
+                setSelectedItems(newItems);
+              }}
+              type="product"
+            />
           </div>
         )}
       </div>
@@ -781,7 +720,9 @@ export default function PercentageDiscountForm({
         onTiersChange={setSelectedTiers}
         onRestrictionToggle={setCustomerRestrictionEnabled}
         error={errors.customerTierSelection}
-        onErrorClear={() => setErrors((prev) => ({ ...prev, customerTierSelection: undefined }))}
+        onErrorClear={() =>
+          setErrors((prev) => ({ ...prev, customerTierSelection: undefined }))
+        }
       />
 
       <div className="flex items-center justify-end mt-4">

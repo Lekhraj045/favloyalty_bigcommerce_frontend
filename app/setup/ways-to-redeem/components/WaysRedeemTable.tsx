@@ -1,6 +1,7 @@
+import { useAppSelector } from "@/store/hooks";
 import type { RedeemCoupon } from "@/utils/api";
-import type { Selection } from "@heroui/react";
 import { Switch } from "@heroui/switch";
+import type { Selection } from "@heroui/table";
 import {
   Table,
   TableBody,
@@ -13,6 +14,7 @@ import { Tooltip } from "@heroui/tooltip";
 import { SquarePen, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
+import { getCurrencyIcon } from "../../ways-to-earn/utils";
 import DeleteCouponModal from "./DeleteCouponModal";
 
 interface WaysRedeemTableProps {
@@ -61,7 +63,10 @@ const formatRedeemType = (redeemType: string): string => {
 };
 
 // Helper function to format coupon name/description
-const getCouponDisplayName = (coupon: RedeemCoupon): string => {
+const getCouponDisplayName = (
+  coupon: RedeemCoupon,
+  storeCurrency: string,
+): string => {
   // For freeProduct, show the product name from selectedItems
   if (coupon.redeemType === "freeProduct") {
     const items = coupon.coupon?.restriction?.selectedItems?.items;
@@ -73,14 +78,33 @@ const getCouponDisplayName = (coupon: RedeemCoupon): string => {
     }
     return "Free Product";
   }
+  // For freeShipping, always show "Free Shipping"
+  if (coupon.redeemType === "freeShipping") {
+    return "Free Shipping";
+  }
+  // Custom name if set
   if (coupon.coupon?.name) {
     return coupon.coupon.name;
   }
-  if (coupon.coupon?.discountAmount) {
-    return `$${coupon.coupon.discountAmount} off`;
+  // For storeCredit (fixed discount), use discountAmount with $
+  if (coupon.redeemType === "storeCredit") {
+    if (coupon.coupon?.discountAmount) {
+      return `${getCurrencyIcon(storeCurrency)}${coupon.coupon.discountAmount} off`;
+    }
+    if (coupon.coupon?.value) {
+      return `${getCurrencyIcon(storeCurrency)}${coupon.coupon.value} off`;
+    }
+    return "Fixed Discount";
   }
-  if (coupon.coupon?.value) {
-    return `${coupon.coupon.value}% off`;
+  // For purchase (percentage discount), use value with %
+  if (coupon.redeemType === "purchase") {
+    if (coupon.coupon?.discountAmount) {
+      return `${coupon.coupon.discountAmount}% off`;
+    }
+    if (coupon.coupon?.value) {
+      return `${coupon.coupon.value}% off`;
+    }
+    return "Percentage Discount";
   }
   return formatRedeemType(coupon.redeemType);
 };
@@ -188,6 +212,7 @@ export default function WaysRedeemTable({
     name: string;
   } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const storeCurrency = useAppSelector((state) => state.channel.storeCurrency);
 
   // Helper function to check if coupon is fixed discount
   const isFixedDiscount = (redeemType: string): boolean => {
@@ -202,7 +227,7 @@ export default function WaysRedeemTable({
   const handleToggleCoupon = (
     couponId: string | undefined,
     currentStatus: boolean,
-    redeemType: string
+    redeemType: string,
   ) => {
     if (!couponId) {
       return;
@@ -308,7 +333,7 @@ export default function WaysRedeemTable({
           }
         >
           {validCoupons.map((coupon) => {
-            const couponName = getCouponDisplayName(coupon);
+            const couponName = getCouponDisplayName(coupon, storeCurrency);
             const redeemType = formatRedeemType(coupon.redeemType);
             const points = getDisplayPoints(coupon);
             const expiryDays = getExpiryDays(coupon);
@@ -342,7 +367,8 @@ export default function WaysRedeemTable({
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = iconPath;
-                            (e.target as HTMLImageElement).className = "w-6 h-6";
+                            (e.target as HTMLImageElement).className =
+                              "w-6 h-6";
                           }}
                         />
                       ) : (
@@ -413,7 +439,7 @@ export default function WaysRedeemTable({
                           e.preventDefault();
                           e.stopPropagation();
                           const featureName = formatRedeemType(
-                            coupon.redeemType
+                            coupon.redeemType,
                           );
                           if (onPremiumClick) {
                             onPremiumClick(featureName);
@@ -435,7 +461,7 @@ export default function WaysRedeemTable({
                           handleToggleCoupon(
                             coupon._id,
                             isActive,
-                            coupon.redeemType
+                            coupon.redeemType,
                           );
                         }}
                         isDisabled={isPremium}

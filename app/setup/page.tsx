@@ -5,7 +5,7 @@ import SetupNavigation from "@/components/SetupNavigation";
 import { Alert } from "@heroui/alert";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import PointsSetting from "./setup/points-tier-system/PointsSetting";
+import PointsSetting from "./points-tier-system/PointsSetting";
 
 function HomeContent() {
   const searchParams = useSearchParams();

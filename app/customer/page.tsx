@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import ChannelSelector from "@/components/ChannelSelector";
-import { Button } from "@heroui/button";
-import { ArrowLeft } from "lucide-react";
-import CustomerTable from "./components/CustomerTable";
 import { getStorePlan, StorePlan } from "@/utils/api";
+import { Button } from "@heroui/button";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import CustomerTable from "./components/CustomerTable";
 
 export default function CustomersPage() {
   const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
+  const router = useRouter();
 
   // Load store plan information
   useEffect(() => {
@@ -19,7 +20,14 @@ export default function CustomersPage() {
       } catch (error) {
         console.error("Error loading store plan:", error);
         // Default to free plan if error
-        setStorePlan({ plan: "free", trialDaysRemaining: null, paypalSubscriptionId: null, limitReached: false, orderCount: 0, selectedOrderLimit: 0 });
+        setStorePlan({
+          plan: "free",
+          trialDaysRemaining: null,
+          paypalSubscriptionId: null,
+          limitReached: false,
+          orderCount: 0,
+          selectedOrderLimit: 0,
+        });
       }
     };
     loadStorePlan();
@@ -39,7 +47,12 @@ export default function CustomersPage() {
               <ChannelSelector />
               {/* Only show Upgrade button for free plan users or when limit reached */}
               {(storePlan?.plan === "free" || storePlan?.limitReached) && (
-                <Button className="custom-btn">Upgrade</Button>
+                <Button
+                  onClick={() => router.push("/pricing")}
+                  className="custom-btn"
+                >
+                  Upgrade
+                </Button>
               )}
             </div>
           </div>

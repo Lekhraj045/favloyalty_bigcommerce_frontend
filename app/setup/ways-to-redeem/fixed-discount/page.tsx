@@ -49,7 +49,8 @@ export default function FixedDiscountPage() {
                   className="w-full h-8 border border-[#8a8a8a] rounded-lg px-3 text-[13px] leading-none focus:outline-none bg-[#fdfdfd]"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Please enter the number of points required for every INR 1 discount.
+                  Please enter the number of points required for every INR 1
+                  discount.
                 </p>
               </div>
 

@@ -31,12 +31,12 @@ function LoadPageContent() {
         localStorage.setItem("bc_store_hash", store.hash);
         localStorage.setItem(
           "bc_user_email",
-          store.userEmail || store.email || ""
+          store.userEmail || store.email || "",
         );
         localStorage.setItem("bc_session_token", sessionToken);
         localStorage.setItem(
           "bc_session_expires_at",
-          data.sessionExpiresAt.toString()
+          data.sessionExpiresAt.toString(),
         );
 
         // Store channels array in localStorage
@@ -54,13 +54,13 @@ function LoadPageContent() {
         }
 
         // Redirect to dashboard
-        router.push(`/dashboard?storeHash=${store.hash}`);
+        router.push(`dashboard?storeHash=${store.hash}`);
       } catch (err) {
         console.error("Error:", err);
         setError(
           err instanceof Error
             ? err.message
-            : "Failed to verify app credentials"
+            : "Failed to verify app credentials",
         );
       }
     };

@@ -30,7 +30,7 @@ function CustomiseWidgetContent() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const selectedChannel = useAppSelector(
-    (state) => state.channel.selectedChannel
+    (state) => state.channel.selectedChannel,
   );
   const storeId = getStoreId();
   const channelId = selectedChannel?.id || "";
@@ -76,7 +76,7 @@ function CustomiseWidgetContent() {
 
   // Map launcher type from frontend format to backend format
   const mapLauncherType = (
-    launcher: string
+    launcher: string,
   ): "IconOnly" | "LabelOnly" | "Icon&Label" => {
     switch (launcher) {
       case "icon-only":
@@ -125,7 +125,7 @@ function CustomiseWidgetContent() {
           enable: announcement.enable,
           image: announcement.image,
           link: announcement.link,
-        })
+        }),
       );
 
       const widgetData = {
@@ -153,7 +153,7 @@ function CustomiseWidgetContent() {
       const response = await saveWidgetCustomization(
         storeId,
         channelId,
-        widgetData
+        widgetData,
       );
 
       console.log("Save response:", response);
@@ -203,7 +203,7 @@ function CustomiseWidgetContent() {
             await updatePageCompletionStatus(
               channelId,
               "customiseWidget",
-              isPageCompleted
+              isPageCompleted,
             );
             // Update Redux store to reflect the new completion status
             dispatch(
@@ -211,7 +211,7 @@ function CustomiseWidgetContent() {
                 channelId: channelId,
                 pageType: "customiseWidget",
                 completed: isPageCompleted,
-              })
+              }),
             );
           } catch (error) {
             console.error("Error updating page completion status:", error);
@@ -249,7 +249,7 @@ function CustomiseWidgetContent() {
         }
       } else {
         throw new Error(
-          response?.message || "Save operation did not return success"
+          response?.message || "Save operation did not return success",
         );
       }
     } catch (error: any) {
@@ -323,6 +323,7 @@ function CustomiseWidgetContent() {
             Save
           </Button>
           <Button
+            variant="flat"
             className="custom-btn"
             onClick={() => handleSave(true)}
             isLoading={saveAndNextLoading}

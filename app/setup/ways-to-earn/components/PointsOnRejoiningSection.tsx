@@ -1,7 +1,7 @@
-import { handleInputBlur, handleIntegerInputChange } from "@/utils/formHelpers";
+import { handleInputBlur } from "@/utils/formHelpers";
 import { Switch } from "@heroui/switch";
 import { AlertCircle } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 interface PointsOnRejoiningSectionProps {
   enabled: boolean;
@@ -13,6 +13,11 @@ interface PointsOnRejoiningSectionProps {
   isFreePlan?: boolean;
   onPremiumClick?: (featureName: string) => void;
 }
+
+const RECALL_DAYS_MIN = 1;
+const RECALL_DAYS_MAX = 365;
+const REJOIN_POINTS_MIN = 1;
+const REJOIN_POINTS_MAX = 10000;
 
 export default function PointsOnRejoiningSection({
   enabled,
@@ -52,6 +57,46 @@ export default function PointsOnRejoiningSection({
       const pointsValue = parseInt(points) || 0;
       setPointsError(pointsValue === 0);
     }
+  };
+
+  const handleBoundedIntegerChange = (
+    value: string,
+    setter: (value: string) => void,
+    min: number,
+    max: number,
+  ) => {
+    const num = parseInt(value, 10);
+    if (value === "" || value === undefined) {
+      setter(value);
+      return;
+    }
+    if (Number.isNaN(num)) {
+      setter("");
+      return;
+    }
+    if (num > max) {
+      setter(String(max));
+      return;
+    }
+    setter(value.replace(/[^0-9]/g, "").replace(/^0+/, "") || "0");
+  };
+
+  const handleBoundedIntegerBlur = (
+    currentValue: string,
+    setter: (value: string) => void,
+    min: number,
+    max: number,
+  ) => {
+    const num = parseInt(currentValue, 10);
+    if (currentValue === "" || Number.isNaN(num) || num < min) {
+      setter(String(min));
+      return;
+    }
+    if (num > max) {
+      setter(String(max));
+      return;
+    }
+    setter(String(num));
   };
 
   return (
@@ -112,9 +157,21 @@ export default function PointsOnRejoiningSection({
               type="text"
               value={recallDays}
               onChange={(e) =>
-                handleIntegerInputChange(e.target.value, onRecallDaysChange)
+                handleBoundedIntegerChange(
+                  e.target.value,
+                  onRecallDaysChange,
+                  RECALL_DAYS_MIN,
+                  RECALL_DAYS_MAX,
+                )
               }
-              onBlur={() => handleInputBlur(recallDays, onRecallDaysChange)}
+              onBlur={() =>
+                handleBoundedIntegerBlur(
+                  recallDays,
+                  onRecallDaysChange,
+                  RECALL_DAYS_MIN,
+                  RECALL_DAYS_MAX,
+                )
+              }
               disabled={!enabled}
               className={`w-full h-8 border border-[#8a8a8a] rounded-lg px-3 text-[13px] leading-none focus:outline-none ${
                 enabled
@@ -135,9 +192,25 @@ export default function PointsOnRejoiningSection({
               type="text"
               value={points}
               onChange={(e) =>
-                handleIntegerInputChange(e.target.value, onPointsChange)
+                handleBoundedIntegerChange(
+                  e.target.value,
+                  onPointsChange,
+                  REJOIN_POINTS_MIN,
+                  REJOIN_POINTS_MAX,
+                )
               }
-              onBlur={handlePointsBlur}
+              onBlur={() => {
+                handleBoundedIntegerBlur(
+                  points,
+                  onPointsChange,
+                  REJOIN_POINTS_MIN,
+                  REJOIN_POINTS_MAX,
+                );
+                if (enabled) {
+                  const pointsValue = parseInt(points, 10) || 0;
+                  setPointsError(pointsValue === 0);
+                }
+              }}
               disabled={!enabled}
               onKeyDown={(e) => {
                 if (
@@ -155,8 +228,8 @@ export default function PointsOnRejoiningSection({
                 pointsError && enabled
                   ? "border-red-500 bg-red-50 cursor-text"
                   : enabled
-                  ? "border-[#8a8a8a] bg-[#fdfdfd] cursor-text"
-                  : "border-[#8a8a8a] bg-gray-100 cursor-not-allowed opacity-50"
+                    ? "border-[#8a8a8a] bg-[#fdfdfd] cursor-text"
+                    : "border-[#8a8a8a] bg-gray-100 cursor-not-allowed opacity-50"
               }`}
             />
             {pointsError && enabled ? (

@@ -6,6 +6,7 @@ import {
   getStoreId,
   type Customer,
 } from "@/utils/api";
+import useDebounce from "@/utils/useDebounce";
 import { Button } from "@heroui/button";
 import {
   Table,
@@ -18,13 +19,17 @@ import {
 import { Tooltip } from "@heroui/tooltip";
 import { Eye, Plus, Search, SquarePen, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import AdjustCustomerPointsModal from "./AdjustCustomerPointsModal";
 
 export default function CustomerTable() {
   const router = useRouter();
   const { selectedChannel } = useAppSelector((state) => state.channel);
   const [searchKeyword, setSearchKeyword] = useState("");
+  const debouncedSearchKeyword = useDebounce({
+    value: searchKeyword,
+    delay: 300,
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -348,14 +353,18 @@ export default function CustomerTable() {
   }, [selectedChannel?.channel_id, loadCustomers]);
 
   // Filter customers based on search keyword
-  const filteredCustomers = customers.filter((customer) => {
-    if (!searchKeyword) return true;
-    const keyword = searchKeyword.toLowerCase();
-    const fullName =
-      `${customer.firstName || ""} ${customer.lastName || ""}`.toLowerCase();
-    const email = customer.email.toLowerCase();
-    return fullName.includes(keyword) || email.includes(keyword);
-  });
+  const filteredCustomers = useMemo(
+    () =>
+      customers.filter((customer) => {
+        if (!debouncedSearchKeyword) return true;
+        const keyword = debouncedSearchKeyword.toLowerCase();
+        const fullName =
+          `${customer.firstName || ""} ${customer.lastName || ""}`.toLowerCase();
+        const email = customer.email.toLowerCase();
+        return fullName.includes(keyword) || email.includes(keyword);
+      }),
+    [customers, debouncedSearchKeyword],
+  );
 
   // Get tier name from customer data (uses tierDisplay from API if available)
   const getTierName = (customer: Customer) => {
@@ -529,6 +538,11 @@ export default function CustomerTable() {
                             <Eye
                               size={14}
                               className="cursor-pointer hover:text-black"
+                              onClick={() =>
+                                router.push(
+                                  `/customer/customer-details?id=${customer.id}&viewOnly=1`,
+                                )
+                              }
                             />
                           </Tooltip>
                         </div>

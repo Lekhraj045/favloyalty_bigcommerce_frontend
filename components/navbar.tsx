@@ -1,23 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import NextLink from "next/link";
-import Image from "next/image";
-import { usePathname } from "next/navigation";
-import clsx from "clsx";
 import {
-  Cog6ToothIcon,
-  ChartBarIcon,
-  UsersIcon,
-  EnvelopeIcon,
-  CreditCardIcon,
   Bars3Icon,
+  ChartBarIcon,
+  Cog6ToothIcon,
+  CreditCardIcon,
+  EnvelopeIcon,
+  UsersIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import clsx from "clsx";
+import Image from "next/image";
+import NextLink from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const EXPANDED_PADDING = "240px";
 const COLLAPSED_PADDING = "5rem";
-
 
 export const Navbar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -38,7 +37,7 @@ export const Navbar = () => {
     {
       label: "Setup FavLoyalty",
       icon: <Cog6ToothIcon className="w-5 h-5" />,
-      href: "/",
+      href: "/setup",
     },
     {
       label: "Dashboard",
@@ -68,7 +67,7 @@ export const Navbar = () => {
       <aside
         className={clsx(
           "fixed left-0 top-0 h-screen bg-[#EBEBEB] border-r border-gray-200 transition-all duration-300 z-50",
-          isCollapsed ? "w-20" : "w-[240px]"
+          isCollapsed ? "w-20" : "w-[240px]",
         )}
       >
         <div className="flex flex-col h-full justify-between">
@@ -101,25 +100,35 @@ export const Navbar = () => {
             {/* Navigation Items */}
             <nav className="flex-1 p-3">
               <div className="space-y-2">
-                {navItems.map((item) => (
-                  <NextLink
-                    key={item.href}
-                    href={item.href}
-                    className={clsx(
-                      "flex items-center gap-3 px-3 py-2 mb-0 rounded-lg transition-colors",
-                      pathname === item.href
-                        ? "bg-white text-[#303030] font-bold"
-                        : "hover:bg-[#f1f1f1] text-gray-700"
-                    )}
-                  >
-                    <span className={clsx(isCollapsed && "mx-auto")}>
-                      {item.icon}
-                    </span>
-                    {!isCollapsed && (
-                      <span className="text-[13px] whitespace-nowrap">{item.label}</span>
-                    )}
-                  </NextLink>
-                ))}
+                {navItems.map((item) => {
+                  const isActive =
+                    item.href === "/"
+                      ? pathname === "/"
+                      : pathname === item.href ||
+                        pathname.startsWith(item.href + "/");
+
+                  return (
+                    <NextLink
+                      key={item.href}
+                      href={item.href}
+                      className={clsx(
+                        "flex items-center gap-3 px-3 py-2 mb-0 rounded-lg transition-colors",
+                        isActive
+                          ? "bg-white text-[#303030] font-bold"
+                          : "hover:bg-[#f1f1f1] text-gray-700",
+                      )}
+                    >
+                      <span className={clsx(isCollapsed && "mx-auto")}>
+                        {item.icon}
+                      </span>
+                      {!isCollapsed && (
+                        <span className="text-[13px] whitespace-nowrap">
+                          {item.label}
+                        </span>
+                      )}
+                    </NextLink>
+                  );
+                })}
               </div>
             </nav>
           </div>

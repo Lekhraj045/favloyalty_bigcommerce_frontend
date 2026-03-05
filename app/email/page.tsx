@@ -19,6 +19,7 @@ import { Switch } from "@heroui/switch";
 import { Pencil, Upload, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import React, {
   useRef as ReactUseRef,
   useEffect,
@@ -42,7 +43,7 @@ interface EmailNotification {
 // This is used ONLY for initial extraction when loading a template
 // The extracted values are stored as separate state and never modify the original HTML
 const parseEmailBody = (
-  html: string
+  html: string,
 ): { heading: string; description: string; buttonText: string } => {
   if (!html) return { heading: "", description: "", buttonText: "" };
 
@@ -102,7 +103,7 @@ const parseEmailBody = (
 const updateTextNodePreservingStructure = (
   element: Element,
   newText: string,
-  doc: Document
+  doc: Document,
 ): void => {
   if (!element) return;
 
@@ -146,7 +147,7 @@ const updateTextNodePreservingStructure = (
 const replaceContentPreservingOuterStyles = (
   element: Element,
   newHtml: string,
-  doc: Document
+  doc: Document,
 ): void => {
   if (!element) return;
 
@@ -155,7 +156,7 @@ const replaceContentPreservingOuterStyles = (
   const styledSpans = directChildren.filter(
     (child) =>
       child.tagName === "SPAN" &&
-      child.getAttribute("style")?.includes("font-size")
+      child.getAttribute("style")?.includes("font-size"),
   );
 
   if (styledSpans.length > 0) {
@@ -168,7 +169,7 @@ const replaceContentPreservingOuterStyles = (
       const nestedSpans = Array.from(child.children).filter(
         (nested) =>
           nested.tagName === "SPAN" &&
-          nested.getAttribute("style")?.includes("font-size")
+          nested.getAttribute("style")?.includes("font-size"),
       );
       if (nestedSpans.length > 0) {
         // Replace content of the nested span, preserving outer structure
@@ -189,7 +190,7 @@ const reconstructEmailBody = (
   heading: string,
   description: string,
   buttonText: string,
-  originalBody: string
+  originalBody: string,
 ): string => {
   if (!originalBody) {
     // If no original body, return empty string (shouldn't happen in practice)
@@ -240,7 +241,7 @@ const reconstructEmailBody = (
 
     // Update button text - try multiple selectors
     let buttonElement = wrapper.querySelector(
-      "#u_content_button_1 a span span"
+      "#u_content_button_1 a span span",
     );
     if (!buttonElement) {
       buttonElement = wrapper.querySelector("#u_content_button_1 a span");
@@ -327,7 +328,7 @@ const EmailBodyEditor = ({
 
   const insertVariable = (
     variable: string,
-    blockType: "heading" | "description"
+    blockType: "heading" | "description",
   ) => {
     const quillRef =
       blockType === "heading" ? headingQuillRef : descriptionQuillRef;
@@ -563,6 +564,8 @@ export default function EmailsPage() {
     useState<string>("");
   const hasDisabledRestrictedEmailsRef = useRef<boolean>(false);
 
+  const router = useRouter();
+
   // Helper function to check if user is on free plan or order limit reached
   const isFreePlan = () => {
     return storePlan?.plan === "free" || storePlan?.limitReached === true;
@@ -670,7 +673,7 @@ export default function EmailsPage() {
   const [savingTemplate, setSavingTemplate] = useState<boolean>(false);
   const [bannerImageFile, setBannerImageFile] = useState<File | null>(null);
   const [bannerImagePreview, setBannerImagePreview] = useState<string | null>(
-    null
+    null,
   );
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
   const [emailBody, setEmailBody] = useState<string>("");
@@ -713,7 +716,7 @@ export default function EmailsPage() {
 
     // Check if any restricted emails are enabled
     const hasRestrictedEnabled = emailNotifications.some(
-      (email) => isRestrictedEmail(email.key) && email.enabled
+      (email) => isRestrictedEmail(email.key) && email.enabled,
     );
 
     if (hasRestrictedEnabled) {
@@ -727,7 +730,7 @@ export default function EmailsPage() {
             // Fetch current settings
             const currentSettings = await getCollectSettings(
               storeId,
-              channelId
+              channelId,
             );
 
             // Prepare updated email settings with restricted emails disabled
@@ -755,8 +758,8 @@ export default function EmailsPage() {
               prev.map((email) =>
                 isRestrictedEmail(email.key)
                   ? { ...email, enabled: false }
-                  : email
-              )
+                  : email,
+              ),
             );
 
             hasDisabledRestrictedEmailsRef.current = true;
@@ -796,13 +799,13 @@ export default function EmailsPage() {
                 ...email,
                 enabled: emailSetting?.enable || false,
               };
-            })
+            }),
           );
         }
       } catch (err) {
         console.error("Error fetching email settings:", err);
         setError(
-          err instanceof Error ? err.message : "Failed to load email settings"
+          err instanceof Error ? err.message : "Failed to load email settings",
         );
       } finally {
         setLoading(false);
@@ -860,7 +863,7 @@ export default function EmailsPage() {
       } catch (err) {
         console.error("Error fetching email template:", err);
         setError(
-          err instanceof Error ? err.message : "Failed to load email template"
+          err instanceof Error ? err.message : "Failed to load email template",
         );
         setSelectedTemplate(null);
       } finally {
@@ -890,7 +893,7 @@ export default function EmailsPage() {
 
     // Optimistically update UI
     setEmailNotifications((prev) =>
-      prev.map((email) => (email.key === key ? { ...email, enabled } : email))
+      prev.map((email) => (email.key === key ? { ...email, enabled } : email)),
     );
 
     try {
@@ -917,13 +920,13 @@ export default function EmailsPage() {
     } catch (err) {
       console.error("Error saving email settings:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to save email settings"
+        err instanceof Error ? err.message : "Failed to save email settings",
       );
       // Revert optimistic update on error
       setEmailNotifications((prev) =>
         prev.map((email) =>
-          email.key === key ? { ...email, enabled: !enabled } : email
-        )
+          email.key === key ? { ...email, enabled: !enabled } : email,
+        ),
       );
     } finally {
       setSavingEmailKey(null);
@@ -1049,7 +1052,7 @@ export default function EmailsPage() {
         emailHeadingText || emailHeading,
         emailDescriptionText,
         emailButtonText,
-        originalEmailBody || selectedTemplate.body || ""
+        originalEmailBody || selectedTemplate.body || "",
       );
 
       // Update the template with new heading, reconstructed body, and banner image
@@ -1064,7 +1067,7 @@ export default function EmailsPage() {
           emailTemplate: selectedTemplate.emailTemplate || "",
           options: selectedTemplate.options || [],
         },
-        bannerImageFile || undefined
+        bannerImageFile || undefined,
       );
 
       // Update local state with the updated template from server
@@ -1098,7 +1101,7 @@ export default function EmailsPage() {
     } catch (err) {
       console.error("Error saving email template:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to save email template"
+        err instanceof Error ? err.message : "Failed to save email template",
       );
     } finally {
       setSavingTemplate(false);
@@ -1120,7 +1123,12 @@ export default function EmailsPage() {
             <div className="flex flex-shrink-0 gap-2.5 items-center">
               <ChannelSelector />
               {(storePlan?.plan === "free" || storePlan?.limitReached) && (
-                <Button className="custom-btn">Upgrade</Button>
+                <Button
+                  onClick={() => router.push("/pricing")}
+                  className="custom-btn"
+                >
+                  Upgrade
+                </Button>
               )}
             </div>
           </div>
@@ -1243,7 +1251,7 @@ export default function EmailsPage() {
                         {selectedTemplate?.heading ||
                           selectedTemplate?.name ||
                           emailNotifications.find(
-                            (e) => e.key === selectedEmail
+                            (e) => e.key === selectedEmail,
                           )?.label ||
                           "Email Preview"}
                       </h2>
@@ -1372,7 +1380,7 @@ export default function EmailsPage() {
                               value,
                               emailDescriptionText,
                               emailButtonText,
-                              originalEmailBody
+                              originalEmailBody,
                             );
                             setEmailBody(newBody);
                           }}
@@ -1383,7 +1391,7 @@ export default function EmailsPage() {
                               emailHeadingText,
                               value,
                               emailButtonText,
-                              originalEmailBody
+                              originalEmailBody,
                             );
                             setEmailBody(newBody);
                           }}
@@ -1394,7 +1402,7 @@ export default function EmailsPage() {
                               emailHeadingText,
                               emailDescriptionText,
                               value,
-                              originalEmailBody
+                              originalEmailBody,
                             );
                             setEmailBody(newBody);
                           }}
@@ -1417,7 +1425,7 @@ export default function EmailsPage() {
                         onClick={() => {
                           const emailLabel =
                             emailNotifications.find(
-                              (e) => e.key === selectedEmail
+                              (e) => e.key === selectedEmail,
                             )?.label || "Email Notification";
                           showUpgradeModalForFeature(emailLabel);
                         }}
@@ -1486,7 +1494,7 @@ export default function EmailsPage() {
                           if (imageUrl.includes("/upload/")) {
                             imageUrl = imageUrl.replace(
                               "/upload/",
-                              "/upload/b_white/"
+                              "/upload/b_white/",
                             );
                           }
                         }
@@ -1498,20 +1506,20 @@ export default function EmailsPage() {
                           const bannerImageHtml = `<div style="background-color: #ffffff; text-align: center; padding: 30px 20px; margin: 0 auto; max-width: 100%; box-sizing: border-box;"><img src="${process.env.NEXT_PUBLIC_BASE_PATH || ""}${imageUrl}" alt="${selectedTemplate.heading || selectedTemplate.name}" style="max-width: 100%; height: auto; display: block; margin: 0 auto; background-color: #ffffff; vertical-align: middle;" /></div>`;
                           templateHtml = templateHtml.replace(
                             /\{\{\{banner_image\}\}\}/g,
-                            bannerImageHtml
+                            bannerImageHtml,
                           );
                         } else {
                           const bannerImageHtml = `<img src="${process.env.NEXT_PUBLIC_BASE_PATH || ""}${imageUrl}" alt="${selectedTemplate.heading || selectedTemplate.name}" style="max-width: 100%; height: auto;" />`;
                           templateHtml = templateHtml.replace(
                             /\{\{\{banner_image\}\}\}/g,
-                            bannerImageHtml
+                            bannerImageHtml,
                           );
                         }
                       } else if (isEditMode) {
                         // Hide banner image in edit mode - replace with empty div to maintain layout
                         templateHtml = templateHtml.replace(
                           /\{\{\{banner_image\}\}\}/g,
-                          '<div style="display: none;"></div>'
+                          '<div style="display: none;"></div>',
                         );
                       }
 
@@ -1519,7 +1527,7 @@ export default function EmailsPage() {
                       if (selectedTemplate.heading) {
                         templateHtml = templateHtml.replace(
                           /\{\{\{heading\}\}\}/g,
-                          selectedTemplate.heading
+                          selectedTemplate.heading,
                         );
                       }
 
@@ -1530,7 +1538,7 @@ export default function EmailsPage() {
                         // Hide body content in edit mode - replace with empty div to maintain layout
                         templateHtml = templateHtml.replace(
                           /\{\{\{body_children\}\}\}/g,
-                          '<div style="display: none;"></div>'
+                          '<div style="display: none;"></div>',
                         );
                       } else {
                         // Use reconstructed body (with edited values) or fallback to original
@@ -1542,7 +1550,7 @@ export default function EmailsPage() {
                         if (bodyContent) {
                           templateHtml = templateHtml.replace(
                             /\{\{\{body_children\}\}\}/g,
-                            bodyContent
+                            bodyContent,
                           );
                         }
                       }

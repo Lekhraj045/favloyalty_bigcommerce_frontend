@@ -2,9 +2,9 @@
 
 import { useAppDispatch } from "@/store/hooks";
 import { setChannels, setSelectedChannel } from "@/store/slices/channelSlice";
+import { getChannels } from "@/utils/api";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { getChannels, type Channel } from "@/utils/api";
 
 function InstallPageContent() {
   const searchParams = useSearchParams();
@@ -38,7 +38,9 @@ function InstallPageContent() {
         }
 
         // Fetch channels for the store
-        const channels: Channel[] = await getChannels(storeId.toString());
+        const { channels, storeCurrency } = await getChannels(
+          storeId.toString(),
+        );
 
         // Store channels array in localStorage
         if (channels && channels.length > 0) {
@@ -61,7 +63,7 @@ function InstallPageContent() {
         setError(
           err instanceof Error
             ? err.message
-            : "An error occurred during installation"
+            : "An error occurred during installation",
         );
       }
     };
@@ -73,7 +75,9 @@ function InstallPageContent() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Installation Error</h1>
+          <h1 className="text-2xl font-bold text-red-600 mb-4">
+            Installation Error
+          </h1>
           <p className="text-gray-600">{error}</p>
         </div>
       </div>
@@ -84,7 +88,9 @@ function InstallPageContent() {
     <div className="flex items-center justify-center min-h-screen">
       <div className="text-center">
         <h1 className="text-2xl font-bold mb-4">Completing Installation...</h1>
-        <p className="text-gray-600">Please wait while we set up your account.</p>
+        <p className="text-gray-600">
+          Please wait while we set up your account.
+        </p>
       </div>
     </div>
   );
@@ -92,13 +98,15 @@ function InstallPageContent() {
 
 export default function InstallPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Loading...</h1>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-4">Loading...</h1>
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <InstallPageContent />
     </Suspense>
   );

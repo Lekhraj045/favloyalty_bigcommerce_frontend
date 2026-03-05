@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useAppSelector } from "@/store/hooks";
+import { bulkImportPoints, getStoreId } from "@/utils/api";
 import { Button } from "@heroui/button";
 import {
   Modal,
@@ -9,11 +10,10 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@heroui/modal";
-import { useDropzone, FileRejection } from "react-dropzone";
-import { Info, X } from "lucide-react";
-import { useAppSelector } from "@/store/hooks";
-import { getStoreId, bulkImportPoints } from "@/utils/api";
 import { addToast } from "@heroui/toast";
+import { Info, X } from "lucide-react";
+import { useCallback, useState } from "react";
+import { FileRejection, useDropzone } from "react-dropzone";
 
 interface AdjustCustomerPointsModalProps {
   isOpen: boolean;
@@ -26,7 +26,9 @@ export default function AdjustCustomerPointsModal({
   onClose,
   onSuccess,
 }: AdjustCustomerPointsModalProps) {
-  const selectedChannel = useAppSelector((state) => state.channel.selectedChannel);
+  const selectedChannel = useAppSelector(
+    (state) => state.channel.selectedChannel,
+  );
   const [importType, setImportType] = useState("reset");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,37 +66,47 @@ export default function AdjustCustomerPointsModal({
   });
 
   // Parse CSV file
-  const parseCSV = async (file: File): Promise<Array<{ email: string; points: number }>> => {
+  const parseCSV = async (
+    file: File,
+  ): Promise<Array<{ email: string; points: number }>> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
+
       reader.onload = (e) => {
         try {
           const text = e.target?.result as string;
           const lines = text.split("\n").filter((line) => line.trim() !== "");
-          
+
           if (lines.length < 2) {
-            reject(new Error("CSV file must contain at least a header row and one data row"));
+            reject(
+              new Error(
+                "CSV file must contain at least a header row and one data row",
+              ),
+            );
             return;
           }
 
           // Check header
           const header = lines[0].toLowerCase().trim();
           if (!header.includes("email") || !header.includes("points")) {
-            reject(new Error("CSV file must have 'email' and 'points' columns"));
+            reject(
+              new Error("CSV file must have 'email' and 'points' columns"),
+            );
             return;
           }
 
           // Parse data rows
           const customers: Array<{ email: string; points: number }> = [];
-          
+
           for (let i = 1; i < lines.length; i++) {
             const line = lines[i].trim();
             if (!line) continue;
 
             // Handle CSV parsing (simple split by comma, handle quoted values)
-            const values = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
-            
+            const values = line
+              .split(",")
+              .map((v) => v.trim().replace(/^"|"$/g, ""));
+
             if (values.length < 2) {
               continue; // Skip invalid rows
             }
@@ -116,7 +128,9 @@ export default function AdjustCustomerPointsModal({
 
           resolve(customers);
         } catch (err) {
-          reject(err instanceof Error ? err : new Error("Failed to parse CSV file"));
+          reject(
+            err instanceof Error ? err : new Error("Failed to parse CSV file"),
+          );
         }
       };
 
@@ -195,9 +209,9 @@ export default function AdjustCustomerPointsModal({
   const handleDownloadTemplate = () => {
     // Create CSV content with sample data
     const csvContent = `email,points
-joe@example.com,100
-laura@example.com,200
-sarah@example.com,450`;
+    joe@example.com,100
+    laura@example.com,200
+    sarah@example.com,450`;
 
     // Create blob from CSV content
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -248,7 +262,9 @@ sarah@example.com,450`;
                     onChange={(e) => setImportType(e.target.value)}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="add">Add points to existing customer balances</option>
+                    <option value="add">
+                      Add points to existing customer balances
+                    </option>
                     <option value="reset">Reset points for customers</option>
                   </select>
                 </div>
@@ -272,12 +288,13 @@ sarah@example.com,450`;
                   {/* Upload Area - Always visible */}
                   <div
                     {...getRootProps()}
-                    className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${isDragActive
-                      ? "border-[#392D5D] bg-[#f3f3f3]"
-                      : error
-                        ? "border-red-500 bg-red-50"
-                        : "border-[#DEDEDE] hover:border-[#392D5D]"
-                      }`}
+                    className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                      isDragActive
+                        ? "border-[#392D5D] bg-[#f3f3f3]"
+                        : error
+                          ? "border-red-500 bg-red-50"
+                          : "border-[#DEDEDE] hover:border-[#392D5D]"
+                    }`}
                   >
                     <input {...getInputProps()} />
                     <div className="flex flex-col items-center gap-2">
@@ -287,17 +304,13 @@ sarah@example.com,450`;
                       <p className="text-sm font-medium text-[#303030]">
                         Click to upload or drag and drop
                       </p>
-                      <p className="text-xs text-[#616161]">
-                        CSV (Max 5 MB)
-                      </p>
+                      <p className="text-xs text-[#616161]">CSV (Max 5 MB)</p>
                     </div>
                   </div>
 
                   {/* Error Message */}
                   {error && (
-                    <p className="text-sm text-red-600 font-medium">
-                      {error}
-                    </p>
+                    <p className="text-sm text-red-600 font-medium">{error}</p>
                   )}
 
                   {/* Preview - Shows below upload area */}
@@ -330,16 +343,16 @@ sarah@example.com,450`;
               </div>
             </ModalBody>
             <ModalFooter>
-              <Button 
-                className="custom-btn-default" 
+              <Button
+                className="custom-btn-default"
                 onPress={onClose}
                 isDisabled={loading}
               >
                 Cancel
               </Button>
-              <Button 
-                className="custom-btn" 
-                onPress={handleSubmit} 
+              <Button
+                className="custom-btn"
+                onPress={handleSubmit}
                 isDisabled={!selectedFile || loading || !selectedChannel}
                 isLoading={loading}
               >
