@@ -19,7 +19,9 @@ import DashLayout from "./components/dash-layout";
 import ResetSettingsModal from "./components/ResetSettingsModal";
 import WhyWidgetDisable from "./components/why-widget-disbale";
 
-const SetupBar = dynamic(() => import("./components/setup-bar"), { ssr: false });
+const SetupBar = dynamic(() => import("./components/setup-bar"), {
+  ssr: false,
+});
 
 export default function DashboardPage() {
   const dispatch = useDispatch();
@@ -161,7 +163,9 @@ export default function DashboardPage() {
               <Button
                 className="custom-btn"
                 onPress={handleToggleWidgetVisibility}
-                isDisabled={!mounted || widgetToggleLoading || !selectedChannel?.id}
+                isDisabled={
+                  !mounted || widgetToggleLoading || !selectedChannel?.id
+                }
                 isLoading={widgetToggleLoading}
               >
                 {effectiveWidgetEnabled ? "Disable Widget" : "Enable Widget"}

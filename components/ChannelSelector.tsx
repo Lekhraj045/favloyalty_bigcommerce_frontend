@@ -117,7 +117,7 @@ export default function ChannelSelector() {
       aria-label="Select Channel"
     >
       {channels.map((channel) => (
-        <SelectItem key={channel.id || ""} value={channel.id || ""}>
+        <SelectItem key={channel.id || ""}>
           {channel.channel_name || `Channel ${channel.channel_id}`}
         </SelectItem>
       ))}

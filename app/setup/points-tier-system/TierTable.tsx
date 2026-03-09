@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@heroui/table";
 import { SquarePen, X } from "lucide-react";
+import type { ReactElement } from "react";
 import { useState, useEffect } from "react";
 
 interface TierTableProps {
@@ -202,7 +203,7 @@ export default function TierTable({
           {/* Tier Name Row */}
           <TableRow key="1">
             <TableCell className="pl-3">Tier Name</TableCell>
-            {tiers.map((tier, index) => (
+            {(tiers.map((tier, index) => (
               <TableCell key={`tier-name-${index}`}>
                 {editing ? (
                   <input
@@ -223,14 +224,14 @@ export default function TierTable({
                   tier.tierName
                 )}
               </TableCell>
-            ))}
+            )) as unknown as ReactElement)}
             <TableCell>&nbsp;</TableCell>
           </TableRow>
 
           {/* Points Required Row */}
           <TableRow key="2">
             <TableCell className="pl-3">Points Required</TableCell>
-            {tiers.map((tier, index) => (
+            {(tiers.map((tier, index) => (
               <TableCell key={`points-required-${index}`}>
                 {editing ? (
                   <div className="flex flex-col">
@@ -259,14 +260,14 @@ export default function TierTable({
                   tier.pointRequired
                 )}
               </TableCell>
-            ))}
+            )) as unknown as ReactElement)}
             <TableCell>&nbsp;</TableCell>
           </TableRow>
 
           {/* Point Multiplier Row */}
           <TableRow key="3">
             <TableCell className="pl-3">Point Multiplier</TableCell>
-            {tiers.map((tier, index) => (
+            {(tiers.map((tier, index) => (
               <TableCell key={`multiplier-${index}`}>
                 {editing ? (
                   <div className="flex flex-col">
@@ -316,7 +317,7 @@ export default function TierTable({
                   tier.multiplier
                 )}
               </TableCell>
-            ))}
+            )) as unknown as ReactElement)}
             <TableCell>&nbsp;</TableCell>
           </TableRow>
         </TableBody>

@@ -32,6 +32,11 @@ import "react-quill-new/dist/quill.snow.css";
 // Dynamically import ReactQuill to avoid SSR issues
 const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
+// ReactQuill forwards ref at runtime but types don't include it; cast so ref is accepted
+const ReactQuillWithRef = ReactQuill as React.ForwardRefExoticComponent<
+  React.ComponentProps<typeof ReactQuill> & React.RefAttributes<unknown>
+>;
+
 interface EmailNotification {
   key: string;
   label: string;
@@ -410,7 +415,7 @@ const EmailBodyEditor = ({
           </div>
         </div>
         <div className="bg-white">
-          <ReactQuill
+          <ReactQuillWithRef
             ref={headingQuillRef}
             theme="snow"
             value={headingValue}
@@ -471,7 +476,7 @@ const EmailBodyEditor = ({
           </div>
         </div>
         <div className="bg-white">
-          <ReactQuill
+          <ReactQuillWithRef
             ref={descriptionQuillRef}
             theme="snow"
             value={descriptionValue}

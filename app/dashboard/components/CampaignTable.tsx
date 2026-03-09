@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactElement } from "react";
 import { useAppSelector } from "@/store/hooks";
 import { getCollectSettings, getPoints, getStoreId, Tier } from "@/utils/api";
 import { Skeleton } from "@heroui/skeleton";
@@ -196,6 +197,22 @@ export default function CampaignTableArea({
     return 1 + columns.length;
   }, [columns.length]);
 
+  const headerColumns = columns.map((c, idx) => (
+    <TableColumn
+      key={c.key}
+      className={
+        [
+          idx === columns.length - 1 ? "!rounded-br-none" : "",
+          c.headerClassName || "",
+        ]
+          .filter(Boolean)
+          .join(" ") || undefined
+      }
+    >
+      {c.header}
+    </TableColumn>
+  ));
+
   return (
     <div className="tierTable border border-[#DEDEDE] rounded-lg overflow-hidden">
       <Table
@@ -210,21 +227,7 @@ export default function CampaignTableArea({
       >
         <TableHeader>
           <TableColumn className="!rounded-bl-none pl-3">Event</TableColumn>
-          {columns.map((c, idx) => (
-            <TableColumn
-              key={c.key}
-              className={
-                [
-                  idx === columns.length - 1 ? "!rounded-br-none" : "",
-                  c.headerClassName || "",
-                ]
-                  .filter(Boolean)
-                  .join(" ") || undefined
-              }
-            >
-              {c.header}
-            </TableColumn>
-          ))}
+          {(headerColumns as unknown as ReactElement)}
         </TableHeader>
 
         <TableBody>
@@ -235,23 +238,23 @@ export default function CampaignTableArea({
                 <TableCell className="pl-3">
                   <Skeleton className="h-4 w-32 rounded" />
                 </TableCell>
-                {Array.from({ length: Math.max(0, columnCount - 1) }).map(
+                {(Array.from({ length: Math.max(0, columnCount - 1) }).map(
                   (_, colIdx) => (
                     <TableCell key={`skeleton_${rowIdx}_${colIdx}`}>
                       <Skeleton className="h-6 w-16 rounded-full mx-auto" />
                     </TableCell>
                   ),
-                )}
+                )) as unknown as ReactElement}
               </TableRow>
             ))
           ) : rows.length === 0 ? (
             <TableRow key="empty">
               <TableCell className="pl-3">No events configured yet.</TableCell>
-              {Array.from({ length: Math.max(0, columnCount - 1) }).map(
+              {(Array.from({ length: Math.max(0, columnCount - 1) }).map(
                 (_, idx) => (
                   <TableCell key={`empty_${idx}`}> </TableCell>
                 ),
-              )}
+              )) as unknown as ReactElement}
             </TableRow>
           ) : (
             rows.map((row) => {
@@ -279,8 +282,7 @@ export default function CampaignTableArea({
                       </Tooltip>
                     ) : null}
                   </TableCell>
-
-                  {columns.map((c) => {
+                  {(columns.map((c) => {
                     if (c.kind === "tier") {
                       const multiplier = Number(c.tier.multiplier || 1);
                       const displayValue = isPurchase
@@ -326,7 +328,7 @@ export default function CampaignTableArea({
                         </span>
                       </TableCell>
                     );
-                  })}
+                  }) as unknown as ReactElement)}
                 </TableRow>
               );
             })

@@ -286,12 +286,12 @@ export default function PercentageDiscountForm({
     // Validate product/collection selection when restriction is enabled
     if (!allowCouponForProduct) {
       // Restriction is enabled, check if at least one product or collection is selected
-      if (currentRestrictionType === "product" && selectedItems.length === 0) {
+      if (currentRestrictionType === "product" && (selectedItems ?? []).length === 0) {
         newErrors.productSelection =
           "Please select at least one product or disable the product restriction";
       } else if (
         currentRestrictionType === "collection" &&
-        selectedCollections.length === 0
+        (selectedCollections ?? []).length === 0
       ) {
         newErrors.productSelection =
           "Please select at least one collection or disable the product restriction";
@@ -347,8 +347,8 @@ export default function PercentageDiscountForm({
         pointValue: parseInt(pointValue),
         discountAmount: parseInt(discountAmount),
         expire: expireCoupon.trim() === "" ? null : expireCoupon.trim(),
-        selectedItems: allowCouponForProduct ? [] : selectedItems,
-        selectedCollections: allowCouponForProduct ? [] : selectedCollections,
+        selectedItems: allowCouponForProduct ? [] : (selectedItems ?? []),
+        selectedCollections: allowCouponForProduct ? [] : (selectedCollections ?? []),
         seletedCust: {
           tier: validatedTiers,
           tag: [],
@@ -677,7 +677,7 @@ export default function PercentageDiscountForm({
                   variantId: "", // Variant ID not available from product list
                   productId: product.id.toString(),
                 };
-                setSelectedItems([...selectedItems, newItem]);
+                setSelectedItems([...(selectedItems ?? []), newItem]);
                 // Clear product selection error when a product is added
                 if (errors.productSelection) {
                   setErrors((prev) => ({
@@ -686,7 +686,7 @@ export default function PercentageDiscountForm({
                   }));
                 }
               }}
-              selectedProducts={selectedItems.map((item) => ({
+              selectedProducts={(selectedItems ?? []).map((item) => ({
                 id: parseInt(item.ids || "0"),
                 name: item.value,
                 sku: "",
@@ -701,9 +701,9 @@ export default function PercentageDiscountForm({
 
             {/* Product Table */}
             <ProductTable
-              items={selectedItems}
+              items={selectedItems ?? []}
               onRemove={(index) => {
-                const newItems = [...selectedItems];
+                const newItems = [...(selectedItems ?? [])];
                 newItems.splice(index, 1);
                 setSelectedItems(newItems);
               }}
