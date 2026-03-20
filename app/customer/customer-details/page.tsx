@@ -441,7 +441,7 @@ function CustomerDetailsContent() {
                         const isTopTier =
                           !customer.tierOptions ||
                           currentTierIndex >= maxTierIndex;
-                        return (
+                        return !viewOnly ? (
                           <Button
                             className="custom-btn"
                             onPress={() => setIsAdjustTierModalOpen(true)}
@@ -451,7 +451,7 @@ function CustomerDetailsContent() {
                               ? "Top Tier (no upgrade)"
                               : "Change Tier"}
                           </Button>
-                        );
+                        ) : null;
                       })()}
                     </div>
                   </div>

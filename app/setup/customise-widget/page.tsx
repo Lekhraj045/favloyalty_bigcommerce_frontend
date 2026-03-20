@@ -244,7 +244,8 @@ function CustomiseWidgetContent() {
           loadingSetter(false);
 
           // Navigate immediately using window.location.href (most reliable)
-          window.location.href = "/dashboard";
+          // window.location.href = "/dashboard";
+          router.push("/dashboard");
           return;
         }
       } else {

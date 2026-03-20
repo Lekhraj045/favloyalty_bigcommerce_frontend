@@ -29,6 +29,36 @@ import React, {
 } from "react";
 import "react-quill-new/dist/quill.snow.css";
 
+// Backend base URL for resolving relative banner image paths (must match api.ts)
+const EMAIL_BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "https://favbigcommerce.share.zrok.io";
+
+/** Resolve banner image URL for display. Uses backend base for relative paths and for full URLs that point at /uploads/ (fixes wrongly stored frontend URLs). */
+function getBannerImageSrc(imageUrl: string | undefined | null): string {
+  if (!imageUrl || !String(imageUrl).trim()) return "";
+  if (String(imageUrl).trim().startsWith("/images")) {
+    return process.env.NEXT_PUBLIC_BASE_PATH + imageUrl;
+  }
+  const u = String(imageUrl).trim();
+  if (u.startsWith("data:")) return u;
+  const base = EMAIL_BACKEND_URL.replace(/\/$/, "");
+  // Full URL: if path contains /uploads/, image is served by backend — rewrite to backend origin, path from /uploads/ onward
+  if (u.startsWith("http://") || u.startsWith("https://")) {
+    try {
+      const parsed = new URL(u);
+      const uploadsIndex = parsed.pathname.indexOf("/uploads/");
+      if (uploadsIndex !== -1) {
+        return `${base}${parsed.pathname.substring(uploadsIndex)}`;
+      }
+    } catch {
+      // ignore invalid URL
+    }
+    return u;
+  }
+  const path = u.startsWith("/") ? u : `/${u}`;
+  return `${base}${path}`;
+}
+
 // Dynamically import ReactQuill to avoid SSR issues
 const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
@@ -681,6 +711,7 @@ export default function EmailsPage() {
     null,
   );
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
+  const [bannerPreviewError, setBannerPreviewError] = useState(false);
   const [emailBody, setEmailBody] = useState<string>("");
   const [originalEmailBody, setOriginalEmailBody] = useState<string>("");
   const [emailHeadingText, setEmailHeadingText] = useState<string>("");
@@ -865,6 +896,7 @@ export default function EmailsPage() {
         setIsEditMode(false);
         setBannerImageFile(null);
         setBannerImagePreview(null);
+        setBannerPreviewError(false);
       } catch (err) {
         console.error("Error fetching email template:", err);
         setError(
@@ -982,6 +1014,7 @@ export default function EmailsPage() {
     // Reset banner image changes
     setBannerImageFile(null);
     setBannerImagePreview(null);
+    setBannerPreviewError(false);
     if (originalImageUrl) {
       setOriginalImageUrl(originalImageUrl);
     }
@@ -1008,6 +1041,7 @@ export default function EmailsPage() {
 
     setError(null);
     setBannerImageFile(file);
+    setBannerPreviewError(false);
 
     // Create preview
     const reader = new FileReader();
@@ -1098,6 +1132,7 @@ export default function EmailsPage() {
         // Clear file and preview since it's now saved
         setBannerImageFile(null);
         setBannerImagePreview(null);
+        setBannerPreviewError(false);
       }
       setIsEditMode(false);
 
@@ -1174,7 +1209,10 @@ export default function EmailsPage() {
                         <div className="flex items-center gap-3 flex-1 min-w-0 relative">
                           <div className="flex-shrink-0 relative">
                             <Image
-                              src={email.icon}
+                              src={
+                                (process.env.NEXT_PUBLIC_BASE_PATH || "") +
+                                email.icon
+                              }
                               alt={email.label}
                               width={30}
                               height={30}
@@ -1347,22 +1385,26 @@ export default function EmailsPage() {
                           <p className="text-xs text-gray-500 mb-2">
                             Current banner image
                           </p>
-                          <div className="w-32 h-32 border border-gray-200 rounded-md overflow-hidden bg-white">
-                            <img
-                              src={
-                                bannerImagePreview ||
-                                originalImageUrl ||
-                                selectedTemplate?.imageUrl ||
-                                ""
-                              }
-                              alt="Banner preview"
-                              className="w-full h-full object-contain"
-                              onError={(e) => {
-                                // Fallback if image fails to load
-                                (e.target as HTMLImageElement).style.display =
-                                  "none";
-                              }}
-                            />
+                          <div className="w-32 h-32 border border-gray-200 rounded-md overflow-hidden bg-white flex items-center justify-center">
+                            {bannerPreviewError ? (
+                              <span className="text-xs text-gray-500 p-2 text-center">
+                                Image unavailable
+                              </span>
+                            ) : (
+                              <img
+                                src={
+                                  bannerImagePreview ||
+                                  getBannerImageSrc(
+                                    originalImageUrl ||
+                                      selectedTemplate?.imageUrl,
+                                  ) ||
+                                  ""
+                                }
+                                alt="Banner preview"
+                                className="w-full h-full object-contain"
+                                onError={() => setBannerPreviewError(true)}
+                              />
+                            )}
                           </div>
                         </div>
                       )}
@@ -1508,13 +1550,16 @@ export default function EmailsPage() {
                         if (needsSpecialStyling) {
                           // Center the image with proper margins and white background
                           // The template already has a centered table cell, so we just need to add padding and ensure white background
-                          const bannerImageHtml = `<div style="background-color: #ffffff; text-align: center; padding: 30px 20px; margin: 0 auto; max-width: 100%; box-sizing: border-box;"><img src="${process.env.NEXT_PUBLIC_BASE_PATH || ""}${imageUrl}" alt="${selectedTemplate.heading || selectedTemplate.name}" style="max-width: 100%; height: auto; display: block; margin: 0 auto; background-color: #ffffff; vertical-align: middle;" /></div>`;
+                          const bannerImageHtml = `<div style="background-color: #ffffff; text-align: center; padding: 30px 20px; margin: 0 auto; max-width: 100%; box-sizing: border-box;"><img src="${getBannerImageSrc(imageUrl)}" alt="${selectedTemplate.heading || selectedTemplate.name}" style="max-width: 100%; height: auto; display: block; margin: 0 auto; background-color: #ffffff; vertical-align: middle;" /></div>`;
                           templateHtml = templateHtml.replace(
                             /\{\{\{banner_image\}\}\}/g,
                             bannerImageHtml,
                           );
                         } else {
-                          const bannerImageHtml = `<img src="${process.env.NEXT_PUBLIC_BASE_PATH || ""}${imageUrl}" alt="${selectedTemplate.heading || selectedTemplate.name}" style="max-width: 100%; height: auto;" />`;
+                          const bannerImageHtml = `<img
+                          src="${getBannerImageSrc(imageUrl)}" 
+                          alt="${selectedTemplate.heading || selectedTemplate.name}"
+                          style="max-width: 100%; height: auto;" />`;
                           templateHtml = templateHtml.replace(
                             /\{\{\{banner_image\}\}\}/g,
                             bannerImageHtml,

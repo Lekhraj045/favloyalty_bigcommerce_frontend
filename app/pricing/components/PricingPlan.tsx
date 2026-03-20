@@ -20,6 +20,7 @@ import { Skeleton } from "@heroui/skeleton";
 import { Spinner } from "@heroui/spinner";
 import { addToast } from "@heroui/toast";
 import { AlertTriangle, Check, Lock, Shield, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 interface PricingPlanAreaProps {
@@ -50,6 +51,8 @@ export default function PricingPlanArea({
   const [showDowngradeWarning, setShowDowngradeWarning] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+
+  const router = useRouter();
 
   // Get user, channel, and store IDs from localStorage
   const getIds = () => {
@@ -305,7 +308,7 @@ export default function PricingPlanArea({
               params.append("payment", "success");
 
               setTimeout(() => {
-                window.location.href = `/?${params.toString()}`;
+                router.push(`pricing?${params.toString()}`);
               }, 2000);
             } catch (err: any) {
               setError(err.message || "Failed to capture payment");
@@ -430,7 +433,12 @@ export default function PricingPlanArea({
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Free Trial:</span>
                         <span className="font-medium flex items-center gap-1">
-                          <span>{storePlan?.trialDaysRemaining === null ? 14 : (storePlan?.trialDaysRemaining || 0)} days</span>
+                          <span>
+                            {storePlan?.trialDaysRemaining === null
+                              ? 14
+                              : storePlan?.trialDaysRemaining || 0}{" "}
+                            days
+                          </span>
                         </span>
                       </div>
                     </div>
@@ -463,7 +471,12 @@ export default function PricingPlanArea({
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-teal-500 flex-shrink-0" />
-                        <span>{storePlan?.trialDaysRemaining === null ? 14 : (storePlan?.trialDaysRemaining || 0)}-day free trial</span>
+                        <span>
+                          {storePlan?.trialDaysRemaining === null
+                            ? 14
+                            : storePlan?.trialDaysRemaining || 0}
+                          -day free trial
+                        </span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-teal-500 flex-shrink-0" />
@@ -581,7 +594,9 @@ export default function PricingPlanArea({
                           </a>
                         </p>
                         <p className="text-green-600 font-medium">
-                          {(storePlan?.trialDaysRemaining === null || (storePlan?.trialDaysRemaining && storePlan.trialDaysRemaining > 0)) 
+                          {storePlan?.trialDaysRemaining === null ||
+                          (storePlan?.trialDaysRemaining &&
+                            storePlan.trialDaysRemaining > 0)
                             ? `Your ${storePlan?.trialDaysRemaining === null ? 14 : storePlan.trialDaysRemaining}-day free trial starts today. You won't be charged until the trial period ends.`
                             : "No trial period. You will be charged immediately."}
                         </p>
@@ -943,9 +958,10 @@ export default function PricingPlanArea({
                     )}
                   {storePlan?.plan !== "paid" && (
                     <p className="text-xs text-gray-500 mt-2 text-center">
-                      {storePlan?.trialDaysRemaining === null 
+                      {storePlan?.trialDaysRemaining === null
                         ? "Includes a 14-day free trial of all Pro features."
-                        : storePlan?.trialDaysRemaining && storePlan.trialDaysRemaining > 0
+                        : storePlan?.trialDaysRemaining &&
+                            storePlan.trialDaysRemaining > 0
                           ? `Includes a ${storePlan.trialDaysRemaining}-day free trial of all Pro features.`
                           : "No trial period available. Subscription starts immediately."}
                     </p>

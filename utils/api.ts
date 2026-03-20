@@ -2174,6 +2174,7 @@ export interface PointsRedeemedStatsResponse {
   success: boolean;
   data: {
     totalPointsRedeemed: number;
+    totalPointsRedeemedEquivalent?: number;
     stats: PointsRedeemedStat[];
   };
 }

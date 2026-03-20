@@ -9,7 +9,7 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@heroui/modal";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface TierOption {
   tierIndex: number;
@@ -36,8 +36,12 @@ export default function AdjustTierModal({
   onSuccess,
 }: AdjustTierModalProps) {
   // Only tiers higher than current (upgrade only)
-  const upgradeableTiers =
-    tierOptions?.tiers.filter((t) => t.tierIndex > currentTierIndex) ?? [];
+  const upgradeableTiers = useMemo(() => {
+    return (
+      tierOptions?.tiers.filter((t) => t.tierIndex > currentTierIndex) ?? []
+    );
+  }, [tierOptions, currentTierIndex]);
+
   const defaultSelected =
     upgradeableTiers.length > 0
       ? upgradeableTiers[0].tierIndex

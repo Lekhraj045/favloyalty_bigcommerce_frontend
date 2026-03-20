@@ -1,21 +1,24 @@
-'use client'
+"use client";
 
-import { useDropzone, FileRejection } from 'react-dropzone'
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from "react";
+import { FileRejection, useDropzone } from "react-dropzone";
 
 type PreviewFile = {
-  file: File
-  preview: string
-}
+  file: File;
+  preview: string;
+};
 
 interface AnnouncementsUploadAreaProps {
   onImageSelect?: (file: File, preview: string) => void;
   initialPreview?: string | null;
 }
 
-export default function AnnouncementsUploadArea({ onImageSelect, initialPreview }: AnnouncementsUploadAreaProps) {
-  const [files, setFiles] = useState<PreviewFile[]>([])
-  const [error, setError] = useState<string | null>(null)
+export default function AnnouncementsUploadArea({
+  onImageSelect,
+  initialPreview,
+}: AnnouncementsUploadAreaProps) {
+  const [files, setFiles] = useState<PreviewFile[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   // Set initial preview if provided
   useEffect(() => {
@@ -23,55 +26,55 @@ export default function AnnouncementsUploadArea({ onImageSelect, initialPreview 
       // If there's an initial preview but no files, we'll show it in the preview section
       // but we don't need to add it to files array since it's not a File object
     }
-  }, [initialPreview, files.length])
+  }, [initialPreview, files.length]);
 
   const onDropAccepted = (acceptedFiles: File[]) => {
-    setError(null)
+    setError(null);
 
     const mapped = acceptedFiles.map((file) => ({
       file,
       preview: URL.createObjectURL(file),
-    }))
+    }));
 
-    setFiles(mapped)
-    
+    setFiles(mapped);
+
     // Call callback with first file
     if (mapped.length > 0 && onImageSelect) {
       onImageSelect(mapped[0].file, mapped[0].preview);
     }
-  }
+  };
 
   // Cleanup preview URLs
   useEffect(() => {
     return () => {
-      files.forEach(({ preview }) => URL.revokeObjectURL(preview))
-    }
-  }, [files])
+      files.forEach(({ preview }) => URL.revokeObjectURL(preview));
+    };
+  }, [files]);
 
   const onDropRejected = (fileRejections: FileRejection[]) => {
-    const rejection = fileRejections[0]
-    const reason = rejection.errors[0]
+    const rejection = fileRejections[0];
+    const reason = rejection.errors[0];
 
-    if (reason.code === 'file-too-large') {
-      setError('Image size must be less than 2 MB.')
-    } else if (reason.code === 'file-invalid-type') {
-      setError('Only JPEG, PNG and GIF images are allowed.')
+    if (reason.code === "file-too-large") {
+      setError("Image size must be less than 2 MB.");
+    } else if (reason.code === "file-invalid-type") {
+      setError("Only JPEG, PNG and GIF images are allowed.");
     } else {
-      setError('File upload failed. Please try again.')
+      setError("File upload failed. Please try again.");
     }
-  }
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
-      'image/jpeg': [],
-      'image/png': [],
-      'image/gif': [],
+      "image/jpeg": [],
+      "image/png": [],
+      "image/gif": [],
     },
     maxSize: 2 * 1024 * 1024, // ✅ 2 MB
     multiple: false,
     onDropAccepted,
     onDropRejected,
-  })
+  });
 
   return (
     <div className="w-full space-y-3">
@@ -81,10 +84,10 @@ export default function AnnouncementsUploadArea({ onImageSelect, initialPreview 
         className={`border-2 border-dashed border-[#DEDEDE] rounded-xl p-8 text-center cursor-pointer transition
           ${
             isDragActive
-              ? 'border-emerald-600 bg-emerald-50'
+              ? "border-emerald-600 bg-emerald-50"
               : error
-              ? 'border-red-500 bg-red-50'
-              : 'border-gray-300'
+                ? "border-red-500 bg-red-50"
+                : "border-gray-300"
           }
         `}
       >
@@ -96,24 +99,20 @@ export default function AnnouncementsUploadArea({ onImageSelect, initialPreview 
           <p className="text-sm font-medium">
             Click to upload or drag and drop
           </p>
-          <p className="text-xs text-gray-500">
-            JPEG, PNG, GIF (Max 2 MB)
-          </p>
+          <p className="text-xs text-gray-500">JPEG, PNG, GIF (Max 2 MB)</p>
         </div>
       </div>
 
       {/* ❌ Error Message */}
       {error && (
-        <p className="text-sm text-red-600 font-medium">
-          {error}
-        </p>
+        <span className="text-sm text-red-600 font-medium">{error}</span>
       )}
 
       {/* ✅ Preview */}
       {(files.length > 0 || initialPreview) && (
         <div className="border border-[#DEDEDE] rounded-xl p-3 flex items-center gap-3">
           <img
-            src={files.length > 0 ? files[0].preview : initialPreview || ''}
+            src={files.length > 0 ? files[0].preview : initialPreview || ""}
             alt={files.length > 0 ? files[0].file.name : "Current image"}
             className="w-12 h-12 rounded-md border border-[#DEDEDE] object-cover shadow-sm"
           />
@@ -137,5 +136,5 @@ export default function AnnouncementsUploadArea({ onImageSelect, initialPreview 
         </div>
       )}
     </div>
-  )
+  );
 }

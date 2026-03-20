@@ -64,6 +64,7 @@ export default function DashLayout() {
     PointsRedeemedStat[]
   >([]);
   const [totalPointsRedeemed, setTotalPointsRedeemed] = useState(0);
+  const [equivalentPointsRedeemed, setEquivalentPointsRedeemed] = useState(0);
   const [pointsRedeemedLoading, setPointsRedeemedLoading] = useState(false);
   const storeCurrency = useAppSelector((state) => state.channel.storeCurrency);
 
@@ -232,6 +233,7 @@ export default function DashLayout() {
     if (!selectedChannel?.id || !dateRange.start || !dateRange.end) {
       setPointsRedeemedStats([]);
       setTotalPointsRedeemed(0);
+      setEquivalentPointsRedeemed(0);
       return;
     }
     setPointsRedeemedLoading(true);
@@ -254,11 +256,15 @@ export default function DashLayout() {
       if (response.success && response.data) {
         setPointsRedeemedStats(response.data.stats);
         setTotalPointsRedeemed(response.data.totalPointsRedeemed);
+        setEquivalentPointsRedeemed(
+          response.data.totalPointsRedeemedEquivalent ?? 0,
+        );
       }
     } catch (error) {
       console.error("Error fetching points redeemed stats:", error);
       setPointsRedeemedStats([]);
       setTotalPointsRedeemed(0);
+      setEquivalentPointsRedeemed(0);
     } finally {
       setPointsRedeemedLoading(false);
     }
@@ -802,7 +808,12 @@ export default function DashLayout() {
                         <span className="font-bold">
                           {pointsRedeemedLoading
                             ? "..."
-                            : `${totalPointsRedeemed.toLocaleString()} = ${storeCurrency || "USD"}. ${pointsToCurrency(totalPointsRedeemed).toFixed(2)}`}
+                            : `${totalPointsRedeemed.toLocaleString()} = ${storeCurrency || "USD"}. ${(
+                                equivalentPointsRedeemed != null &&
+                                equivalentPointsRedeemed > 0
+                                  ? equivalentPointsRedeemed
+                                  : pointsToCurrency(totalPointsRedeemed)
+                              ).toFixed(2)}`}
                         </span>
                       </div>
                     </div>
