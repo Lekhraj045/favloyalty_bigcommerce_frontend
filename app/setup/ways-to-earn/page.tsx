@@ -2,7 +2,9 @@
 
 import SetupHeader from "@/components/SetupHeader";
 import SetupNavigation from "@/components/SetupNavigation";
+import UnsavedChangesModal from "@/components/UnsavedChangesModal";
 import UpgradeModal from "@/components/UpgradeModal";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { updateChannelCompletionStatus } from "@/store/slices/channelSlice";
 import {
@@ -19,9 +21,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import LoadingSkeleton from "./components/LoadingSkeleton";
 import PointsOnEventsSection from "./components/PointsOnEventsSection";
 import PointsOnRejoiningSection from "./components/PointsOnRejoiningSection";
-import UnsavedChangesModal from "./components/UnsavedChangesModal";
 import WaysToEarnSection from "./components/WaysToEarnSection";
-import { useUnsavedChanges, useWaysToEarnSettings } from "./hooks";
+import { useWaysToEarnSettings } from "./hooks";
 import type { Event } from "./types";
 import { createEventFromForm } from "./utils";
 
@@ -37,6 +38,7 @@ export default function WaysToEarn() {
   const [savedEvents, setSavedEvents] = useState<Event[]>([]);
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveAndNextLoading, setSaveAndNextLoading] = useState(false);
+  const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null);
 
   // Plan and upgrade modal state
   const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
@@ -78,41 +80,12 @@ export default function WaysToEarn() {
     loadStorePlan();
   }, []);
 
-  // Disable restricted features for free plan users or when limit reached when settings are loaded
+  // New channel/store: reset dirty baseline and allow free-plan normalization to run again
   useEffect(() => {
-    if (
-      storePlan &&
-      (storePlan.plan === "free" || storePlan.limitReached === true) &&
-      !settings.loading &&
-      !hasDisabledFeaturesRef.current
-    ) {
-      // Disable Birthday if enabled
-      if (settings.birthday.enabled) {
-        settings.setBirthdayEnabled(false);
-      }
-      // Disable Refer & Earn if enabled
-      if (settings.referEarn.enabled) {
-        settings.setReferEarnEnabled(false);
-      }
-      // Disable Profile Completion if enabled
-      if (settings.profileCompletion.enabled) {
-        settings.setProfileCompletionEnabled(false);
-      }
-      // Disable Newsletter if enabled
-      if (settings.newsletter.enabled) {
-        settings.setNewsletterEnabled(false);
-      }
-      // Disable Events if enabled
-      if (settings.eventsEnabled) {
-        settings.setEventsEnabled(false);
-      }
-      // Disable Rejoin if enabled
-      if (settings.rejoin.enabled) {
-        settings.setRejoinEnabled(false);
-      }
-      hasDisabledFeaturesRef.current = true;
-    }
-  }, [storePlan, settings.loading]);
+    setInitialSnapshot(null);
+    setSavedEvents([]);
+    hasDisabledFeaturesRef.current = false;
+  }, [settings.channelId, settings.storeId]);
 
   // Update savedEvents when events are loaded
   useEffect(() => {
@@ -151,6 +124,95 @@ export default function WaysToEarn() {
     );
   }, [settings.events, settings.eventSearchQuery]);
 
+  const currentSnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        signUp: settings.signUp,
+        everyPurchase: settings.everyPurchase,
+        birthday: settings.birthday,
+        referEarn: settings.referEarn,
+        profileCompletion: settings.profileCompletion,
+        newsletter: settings.newsletter,
+        eventsEnabled: settings.eventsEnabled,
+        events: settings.events,
+        rejoin: settings.rejoin,
+      }),
+    [
+      settings.signUp,
+      settings.everyPurchase,
+      settings.birthday,
+      settings.referEarn,
+      settings.profileCompletion,
+      settings.newsletter,
+      settings.eventsEnabled,
+      settings.events,
+      settings.rejoin,
+    ],
+  );
+  const hasUnsavedChanges =
+    !settings.loading &&
+    initialSnapshot !== null &&
+    currentSnapshot !== initialSnapshot;
+
+  // Capture baseline after load. Runs before free-plan effect below so that effect can call
+  // setInitialSnapshot(null) when it mutates settings; batched updates then re-run this to lock baseline.
+  useEffect(() => {
+    if (!settings.loading && initialSnapshot === null) {
+      setInitialSnapshot(currentSnapshot);
+    }
+  }, [settings.loading, initialSnapshot, currentSnapshot]);
+
+  useEffect(() => {
+    console.log(
+      "Current Snapshot:",
+      currentSnapshot,
+      "initial:",
+      initialSnapshot,
+      "hasUnsavedChanges:",
+      currentSnapshot !== initialSnapshot,
+    );
+  }, [currentSnapshot, initialSnapshot]);
+
+  // Disable restricted features for free plan users or when limit reached when settings are loaded
+  useEffect(() => {
+    if (
+      storePlan &&
+      (storePlan.plan === "free" || storePlan.limitReached === true) &&
+      !settings.loading &&
+      !hasDisabledFeaturesRef.current
+    ) {
+      let changed = false;
+      if (settings.birthday.enabled) {
+        settings.setBirthdayEnabled(false);
+        changed = true;
+      }
+      if (settings.referEarn.enabled) {
+        settings.setReferEarnEnabled(false);
+        changed = true;
+      }
+      if (settings.profileCompletion.enabled) {
+        settings.setProfileCompletionEnabled(false);
+        changed = true;
+      }
+      if (settings.newsletter.enabled) {
+        settings.setNewsletterEnabled(false);
+        changed = true;
+      }
+      if (settings.eventsEnabled) {
+        settings.setEventsEnabled(false);
+        changed = true;
+      }
+      if (settings.rejoin.enabled) {
+        settings.setRejoinEnabled(false);
+        changed = true;
+      }
+      hasDisabledFeaturesRef.current = true;
+      if (changed) {
+        setInitialSnapshot(null);
+      }
+    }
+  }, [storePlan, settings.loading]);
+
   // Handle save
   const handleSave = async (isNext: boolean = false) => {
     if (!settings.storeId || !settings.channelId) {
@@ -159,7 +221,7 @@ export default function WaysToEarn() {
         description: "Store ID or Channel ID is missing",
         color: "danger",
       });
-      return;
+      throw new Error("Store ID or Channel ID is missing");
     }
 
     // Validate that no enabled toggle has 0 points
@@ -209,12 +271,13 @@ export default function WaysToEarn() {
     }
 
     if (validationErrors.length > 0) {
+      const msg = `Please set points greater than minimum value for the following enabled options: ${validationErrors.join(", ")}`;
       addToast({
         title: "Validation Error",
-        description: `Please set points greater than minimum value for the following enabled options: ${validationErrors.join(", ")}`,
+        description: msg,
         color: "danger",
       });
-      return;
+      throw new Error(msg);
     }
 
     const loadingSetter = isNext ? setSaveAndNextLoading : setSaveLoading;
@@ -327,6 +390,7 @@ export default function WaysToEarn() {
           // If no events in response, use current events
           setSavedEvents(JSON.parse(JSON.stringify(settings.events)));
         }
+        setInitialSnapshot(null);
 
         // Update setup progress to 2 (only increases, never decreases)
         try {
@@ -385,21 +449,23 @@ export default function WaysToEarn() {
         description: error.message || "Failed to save settings",
         color: "danger",
       });
+      throw error;
     } finally {
       loadingSetter(false);
     }
   };
 
   // Unsaved changes hook
-  const unsavedChanges = useUnsavedChanges(
-    settings.events,
-    savedEvents,
-    handleSave,
-    () => {
-      // Reset events to saved state
-      settings.setEvents(JSON.parse(JSON.stringify(savedEvents)));
+  const unsavedChanges = useUnsavedChangesGuard({
+    hasUnsavedChanges,
+    onSave: async () => {
+      await handleSave(false);
     },
-  );
+    // onDiscard: () => {
+    //   // Keep previous event reset behavior for discard action.
+    //   settings.setEvents(JSON.parse(JSON.stringify(savedEvents)));
+    // },
+  });
 
   // Event handlers
   const handleAddEvent = () => {
@@ -500,33 +566,26 @@ export default function WaysToEarn() {
             settings.setSignUpEnabled(enabled);
             // Then update points (will be "0" if disabled)
             settings.setSignUpPoints(points);
-            // Mark as unsaved
-            unsavedChanges.setHasUnsavedChanges(true);
           }}
           onEveryPurchaseChange={(enabled, points) => {
             settings.setEveryPurchaseEnabled(enabled);
             settings.setEveryPurchasePoints(points);
-            unsavedChanges.setHasUnsavedChanges(true);
           }}
           onBirthdayChange={(enabled, points) => {
             settings.setBirthdayEnabled(enabled);
             settings.setBirthdayPoints(points);
-            unsavedChanges.setHasUnsavedChanges(true);
           }}
           onReferEarnChange={(enabled, points) => {
             settings.setReferEarnEnabled(enabled);
             settings.setReferEarnPoints(points);
-            unsavedChanges.setHasUnsavedChanges(true);
           }}
           onProfileCompletionChange={(enabled, points) => {
             settings.setProfileCompletionEnabled(enabled);
             settings.setProfileCompletionPoints(points);
-            unsavedChanges.setHasUnsavedChanges(true);
           }}
           onNewsletterChange={(enabled, points) => {
             settings.setNewsletterEnabled(enabled);
             settings.setNewsletterPoints(points);
-            unsavedChanges.setHasUnsavedChanges(true);
           }}
           isFreePlan={isFreePlan()}
           onPremiumClick={showUpgradeModalForFeature}
@@ -540,7 +599,6 @@ export default function WaysToEarn() {
           filteredEvents={filteredEvents}
           onToggleChange={(enabled) => {
             settings.setEventsEnabled(enabled);
-            unsavedChanges.setHasUnsavedChanges(true);
           }}
           onFormChange={(field, value) => {
             // Functional update prevents stale-state overwrites when multiple
@@ -566,7 +624,6 @@ export default function WaysToEarn() {
           points={settings.rejoin.points}
           onToggleChange={(enabled) => {
             settings.setRejoinEnabled(enabled);
-            unsavedChanges.setHasUnsavedChanges(true);
           }}
           onRecallDaysChange={settings.setRecallDays}
           onPointsChange={settings.setRejoinPoints}
@@ -580,7 +637,9 @@ export default function WaysToEarn() {
             color="primary"
             variant="flat"
             className="custom-btn-default"
-            onClick={() => handleSave(false)}
+            onClick={() => {
+              void handleSave(false).catch(() => {});
+            }}
             isLoading={saveLoading}
             disabled={saveLoading || saveAndNextLoading}
           >
@@ -588,7 +647,9 @@ export default function WaysToEarn() {
           </Button>
           <Button
             className="custom-btn"
-            onClick={() => handleSave(true)}
+            onClick={() => {
+              void handleSave(true).catch(() => {});
+            }}
             isLoading={saveAndNextLoading}
             disabled={saveLoading || saveAndNextLoading}
           >
@@ -601,12 +662,8 @@ export default function WaysToEarn() {
       <UnsavedChangesModal
         isOpen={unsavedChanges.showUnsavedModal}
         onSave={unsavedChanges.handleSaveUnsavedChanges}
-        onDiscard={() => {
-          // Reset events to saved state before discarding
-          settings.setEvents(JSON.parse(JSON.stringify(savedEvents)));
-          unsavedChanges.handleDiscardUnsavedChanges();
-        }}
-        isLoading={saveLoading}
+        onDiscard={unsavedChanges.handleDiscardUnsavedChanges}
+        isLoading={saveLoading || saveAndNextLoading}
       />
 
       {/* Upgrade Modal */}

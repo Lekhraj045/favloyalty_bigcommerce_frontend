@@ -37,7 +37,7 @@ export const Navbar = () => {
     {
       label: "Setup FavLoyalty",
       icon: <Cog6ToothIcon className="w-5 h-5" />,
-      href: "/setup",
+      href: "/setup/points-tier-system",
     },
     {
       label: "Dashboard",
@@ -105,7 +105,9 @@ export const Navbar = () => {
                     item.href === "/"
                       ? pathname === "/"
                       : pathname === item.href ||
-                        pathname.startsWith(item.href + "/");
+                        pathname.startsWith(item.href + "/") ||
+                        (pathname.startsWith("/setup") &&
+                          item.href === "/setup/points-tier-system");
 
                   return (
                     <NextLink

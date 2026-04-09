@@ -230,7 +230,7 @@ export default function SetupHeader({
             )}
           </div>
           {/* Only show Upgrade button for free plan users */}
-          {storePlan?.plan === "free" && (
+          {storePlan?.plan === "free" || storePlan?.limitReached ? (
             <Button
               onClick={() => {
                 router.push("/pricing");
@@ -238,6 +238,17 @@ export default function SetupHeader({
               className="custom-btn"
             >
               Upgrade
+            </Button>
+          ) : storePlan?.plan === "paid" ? (
+            <div className="custom-btn-default bg-amber-50 opacity-90">
+              Pro{" "}
+              <span className="ml-1 text-xs bg-green-200 text-green-800 px-1.5 py-0.5 rounded-full">
+                Active
+              </span>
+            </div>
+          ) : (
+            <Button disabled className="custom-btn-default opacity-50">
+              Loading...
             </Button>
           )}
         </div>

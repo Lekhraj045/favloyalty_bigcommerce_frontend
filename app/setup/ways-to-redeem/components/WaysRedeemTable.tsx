@@ -13,7 +13,7 @@ import {
 import { Tooltip } from "@heroui/tooltip";
 import { SquarePen, Trash2 } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { getCurrencyIcon } from "../../ways-to-earn/utils";
 import DeleteCouponModal from "./DeleteCouponModal";
 
@@ -214,6 +214,56 @@ export default function WaysRedeemTable({
   const [deleting, setDeleting] = useState(false);
   const storeCurrency = useAppSelector((state) => state.channel.storeCurrency);
 
+  // Local selection (used when parent doesn't control `selectedKeys`)
+  const [localSelectedKeys, setLocalSelectedKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  const isSelectionControlled = selectedKeys !== undefined;
+
+  const getCouponRowKey = (coupon: RedeemCoupon, index: number): string =>
+    String(
+      coupon._id ||
+        coupon.coupon?.price_rule_id ||
+        coupon.coupon?.name ||
+        `row-${index}`,
+    );
+
+  const rowKeys = validCoupons.map((coupon, index) =>
+    getCouponRowKey(coupon, index),
+  );
+
+  const selectedSet = useMemo(() => {
+    if (!isSelectionControlled) return localSelectedKeys;
+
+    const anyKeys = selectedKeys as any;
+    if (anyKeys === "all") return new Set(rowKeys);
+    if (anyKeys instanceof Set) return new Set(Array.from(anyKeys).map(String));
+    if (Array.isArray(anyKeys)) return new Set(anyKeys.map(String));
+    return anyKeys == null ? new Set() : new Set([String(anyKeys)]);
+  }, [isSelectionControlled, localSelectedKeys, selectedKeys, rowKeys]);
+
+  const toggleRowSelection = (rowKey: string) => {
+    const next = new Set(selectedSet);
+    if (next.has(rowKey)) next.delete(rowKey);
+    else next.add(rowKey);
+
+    if (!isSelectionControlled) setLocalSelectedKeys(next);
+    onSelectionChange?.(next as unknown as Selection);
+  };
+
+  const selectedCount = rowKeys.reduce(
+    (count, k) => count + (selectedSet.has(k) ? 1 : 0),
+    0,
+  );
+  const allSelected = rowKeys.length > 0 && selectedCount === rowKeys.length;
+
+  const toggleAllSelection = () => {
+    const next = allSelected ? new Set<string>() : new Set(rowKeys);
+    if (!isSelectionControlled) setLocalSelectedKeys(next);
+    onSelectionChange?.(next as unknown as Selection);
+  };
+
   // Helper function to check if coupon is fixed discount
   const isFixedDiscount = (redeemType: string): boolean => {
     return redeemType === "storeCredit";
@@ -305,9 +355,6 @@ export default function WaysRedeemTable({
         aria-label="Ways to redeem table"
         shadow="none"
         removeWrapper
-        selectionMode="multiple"
-        selectedKeys={selectedKeys}
-        onSelectionChange={onSelectionChange}
         color="default"
         classNames={{
           th: "bg-[#F7F7F7] text-xs font-normal text-[#616161] px-3 py-2",
@@ -316,7 +363,17 @@ export default function WaysRedeemTable({
         }}
       >
         <TableHeader>
-          <TableColumn className="!rounded-bl-none pl-3">Coupons</TableColumn>
+          <TableColumn className="!rounded-bl-none pl-3" align="center">
+            <input
+              type="checkbox"
+              aria-label="Select all coupons"
+              checked={allSelected}
+              onChange={() => toggleAllSelection()}
+              onClick={(e) => e.stopPropagation()}
+              className="h-4 w-4 accent-green-600"
+            />
+          </TableColumn>
+          <TableColumn>Coupons</TableColumn>
           <TableColumn>Points</TableColumn>
           <TableColumn>Type</TableColumn>
           <TableColumn>Expiry</TableColumn>
@@ -332,7 +389,7 @@ export default function WaysRedeemTable({
             </div>
           }
         >
-          {validCoupons.map((coupon) => {
+          {validCoupons.map((coupon, index) => {
             const couponName = getCouponDisplayName(coupon, storeCurrency);
             const redeemType = formatRedeemType(coupon.redeemType);
             const points = getDisplayPoints(coupon);
@@ -342,15 +399,25 @@ export default function WaysRedeemTable({
             const freeProductImage = getFreeProductImageUrl(coupon);
 
             const rowKey =
-              coupon._id ||
-              coupon.coupon?.price_rule_id ||
-              `coupon-${Math.random()}`;
+              getCouponRowKey(coupon, index);
 
             const isPremium = isFreePlan && isPremiumCoupon(coupon.redeemType);
             const isFixed = isFixedDiscount(coupon.redeemType);
 
             return (
               <TableRow key={rowKey}>
+                <TableCell>
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${couponName}`}
+                      checked={selectedSet.has(String(rowKey))}
+                      onChange={() => toggleRowSelection(String(rowKey))}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-4 w-4 accent-green-600"
+                    />
+                  </div>
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <div

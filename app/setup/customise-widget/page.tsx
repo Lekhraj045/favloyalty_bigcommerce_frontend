@@ -2,6 +2,8 @@
 
 import SetupHeader from "@/components/SetupHeader";
 import SetupNavigation from "@/components/SetupNavigation";
+import UnsavedChangesModal from "@/components/UnsavedChangesModal";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { updateChannelCompletionStatus } from "@/store/slices/channelSlice";
 import {
@@ -14,7 +16,7 @@ import {
 import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AnnouncementsArea from "./components/Announcements";
 import BackgroundPatternArea from "./components/BackgroundPattern";
 import CustomiseWidgetArea from "./components/CustomiseWidget";
@@ -39,6 +41,7 @@ function CustomiseWidgetContent() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveAndNextLoading, setSaveAndNextLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null);
 
   // Load existing widget customization data on mount (only once when storeId/channelId changes)
   useEffect(() => {
@@ -73,6 +76,18 @@ function CustomiseWidgetContent() {
       isMounted = false;
     };
   }, [storeId, channelId]); // Removed loadData from dependencies
+
+  const currentSnapshot = useMemo(() => JSON.stringify(state), [state]);
+  const hasUnsavedChanges =
+    !loading &&
+    initialSnapshot !== null &&
+    currentSnapshot !== initialSnapshot;
+
+  useEffect(() => {
+    if (!loading && initialSnapshot === null) {
+      setInitialSnapshot(currentSnapshot);
+    }
+  }, [loading, initialSnapshot, currentSnapshot]);
 
   // Map launcher type from frontend format to backend format
   const mapLauncherType = (
@@ -111,7 +126,7 @@ function CustomiseWidgetContent() {
         description: "Store ID or Channel ID is missing",
         color: "danger",
       });
-      return;
+      throw new Error("Store ID or Channel ID is missing");
     }
 
     const loadingSetter = isNext ? setSaveAndNextLoading : setSaveLoading;
@@ -224,9 +239,13 @@ function CustomiseWidgetContent() {
           const updatedData = await getWidgetCustomization(storeId, channelId);
           if (updatedData) {
             loadData(updatedData);
+            setInitialSnapshot(null);
+          } else {
+            setInitialSnapshot(JSON.stringify(state));
           }
         } catch (error) {
           console.error("Error reloading widget customization:", error);
+          setInitialSnapshot(JSON.stringify(state));
           // Don't fail the save if reload fails
         }
 
@@ -261,6 +280,7 @@ function CustomiseWidgetContent() {
         color: "danger",
       });
       loadingSetter(false);
+      throw error;
     } finally {
       // Only reset loading if not navigating (isNext = false)
       if (!isNext) {
@@ -268,6 +288,13 @@ function CustomiseWidgetContent() {
       }
     }
   };
+
+  const unsavedGuard = useUnsavedChangesGuard({
+    hasUnsavedChanges,
+    onSave: async () => {
+      await handleSave(false);
+    },
+  });
 
   if (loading) {
     return <LoadingSkeleton />;
@@ -278,7 +305,7 @@ function CustomiseWidgetContent() {
       <div className="flex flex-col gap-4">
         <div className="head">
           <SetupHeader />
-          <SetupNavigation />
+          <SetupNavigation onNavigate={unsavedGuard.safeNavigate} />
         </div>
 
         <div className="flex gap-4 items-start">
@@ -317,7 +344,9 @@ function CustomiseWidgetContent() {
             color="primary"
             variant="flat"
             className="custom-btn-default"
-            onClick={() => handleSave(false)}
+            onClick={() => {
+              void handleSave(false).catch(() => {});
+            }}
             isLoading={saveLoading}
             disabled={saveLoading || saveAndNextLoading}
           >
@@ -326,13 +355,22 @@ function CustomiseWidgetContent() {
           <Button
             variant="flat"
             className="custom-btn"
-            onClick={() => handleSave(true)}
+            onClick={() => {
+              void handleSave(true).catch(() => {});
+            }}
             isLoading={saveAndNextLoading}
             disabled={saveLoading || saveAndNextLoading}
           >
             Save & Next
           </Button>
         </div>
+
+        <UnsavedChangesModal
+          isOpen={unsavedGuard.showUnsavedModal}
+          onSave={unsavedGuard.handleSaveUnsavedChanges}
+          onDiscard={unsavedGuard.handleDiscardUnsavedChanges}
+          isLoading={saveLoading || saveAndNextLoading}
+        />
       </div>
     </div>
   );

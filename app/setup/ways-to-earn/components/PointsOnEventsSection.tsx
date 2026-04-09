@@ -135,14 +135,14 @@ export default function PointsOnEventsSection({
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Event</option>
-                    <option value="Birthday">Birthday</option>
+                    {/* <option value="Birthday">Birthday</option>
                     <option value="Refer & Earn">Refer & Earn</option>
                     <option value="Profile Completion">
                       Profile Completion
                     </option>
                     <option value="Subscribing to newsletter">
                       Subscribing to newsletter
-                    </option>
+                    </option> */}
                     <option value="Easter">Easter</option>
                     <option value="Christmas">Christmas</option>
                     <option value="New Year">New Year</option>

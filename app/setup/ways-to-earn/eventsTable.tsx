@@ -185,23 +185,27 @@ export default function EventsTable({
       return;
     }
 
-    // Convert DateValue to Date
-    const eventDateObj = new Date(
-      editFormData.date.year,
-      editFormData.date.month - 1,
-      editFormData.date.day,
-    );
+    // Keep event date as pure calendar date string to avoid timezone shifts
+    const eventDateYmd = `${editFormData.date.year}-${String(editFormData.date.month).padStart(2, "0")}-${String(editFormData.date.day).padStart(2, "0")}`;
 
     // Check if event date is today (for isImmediate)
     const todayDate = new Date();
     todayDate.setHours(0, 0, 0, 0);
-    const selectedDate = new Date(eventDateObj);
+    const selectedDate = new Date(
+      editFormData.date.year,
+      editFormData.date.month - 1,
+      editFormData.date.day,
+    );
     selectedDate.setHours(0, 0, 0, 0);
     const isImmediate = selectedDate.getTime() === todayDate.getTime();
 
     // Check for duplicate event (same name and date, excluding the current event being edited)
     // eventsArray is already declared above, so we reuse it
-    const eventDate = new Date(eventDateObj);
+    const eventDate = new Date(
+      editFormData.date.year,
+      editFormData.date.month - 1,
+      editFormData.date.day,
+    );
     eventDate.setHours(0, 0, 0, 0);
 
     const isDuplicate = eventsArray.some((existingEvent, existingIndex) => {
@@ -249,7 +253,7 @@ export default function EventsTable({
     const updatedEvent: Event = {
       ...event,
       name: trimmedEventName,
-      eventDate: eventDateObj.toISOString(),
+      eventDate: eventDateYmd,
       point: pointsValue,
       isImmediate: isImmediate,
     };

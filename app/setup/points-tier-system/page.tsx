@@ -1,20 +1,23 @@
 "use client";
 
-import React from 'react'
-import PointsSetting from './PointsSetting'
-import SetupNavigation from '@/components/SetupNavigation'
-import SetupHeader from '@/components/SetupHeader'
+import SetupHeader from "@/components/SetupHeader";
+import SetupNavigation from "@/components/SetupNavigation";
+import React from "react";
+import PointsSetting from "./PointsSetting";
 
 export default function PointsTierSystem() {
+  const [onNavigate, setOnNavigate] =
+    React.useState<((route: string) => void)>();
+
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-col gap-4">
         <div className="head">
           <SetupHeader />
-          <SetupNavigation />
+          <SetupNavigation onNavigate={onNavigate} />
         </div>
-        <PointsSetting />
+        <PointsSetting exposeNavigate={setOnNavigate} />
       </div>
     </div>
-  )
+  );
 }

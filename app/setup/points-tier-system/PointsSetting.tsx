@@ -1,6 +1,8 @@
 "use client";
 
+import UnsavedChangesModal from "@/components/UnsavedChangesModal";
 import UpgradeModal from "@/components/UpgradeModal";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { updateChannelCompletionStatus } from "@/store/slices/channelSlice";
 import { setPointsData } from "@/store/slices/pointsSlice";
@@ -26,7 +28,7 @@ import { addToast } from "@heroui/toast";
 import { Upload } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CustomPointNameModal from "./CustomPointNameModal";
 import TierTable from "./TierTable";
 
@@ -39,7 +41,11 @@ interface ValidationErrors {
   multiplier?: string;
 }
 
-export default function PointsSetting() {
+interface PointsSettingProps {
+  exposeNavigate?: (navigate?: (route: string) => void) => void;
+}
+
+export default function PointsSetting({ exposeNavigate }: PointsSettingProps) {
   const router = useRouter();
 
   // Form state
@@ -94,6 +100,8 @@ export default function PointsSetting() {
   const storeId = getStoreId();
   const channelId = selectedChannel?.id || null;
   const [pointId, setPointId] = useState<string | null>(null);
+  const [isLocal, setIsLocal] = useState(false);
+  const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null);
 
   const logos = [
     "point-icon1.svg",
@@ -117,6 +125,36 @@ export default function PointsSetting() {
     "Reward points",
     "Hearts",
   ];
+
+  const currentSnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        pointName,
+        selectedPointNameOption,
+        selectedLogo,
+        customLogoName: customLogo?.name || null,
+        logoDetails,
+        expiry,
+        expiriesInDays,
+        tierStatus,
+        tiers,
+        customPointNames,
+      }),
+    [
+      pointName,
+      selectedPointNameOption,
+      selectedLogo,
+      customLogo,
+      logoDetails,
+      expiry,
+      expiriesInDays,
+      tierStatus,
+      tiers,
+      customPointNames,
+    ],
+  );
+  const hasUnsavedChanges =
+    !loading && initialSnapshot !== null && currentSnapshot !== initialSnapshot;
 
   // Reset form to default values
   const resetFormToDefaults = useCallback(() => {
@@ -256,6 +294,7 @@ export default function PointsSetting() {
           } else {
             setCustomPointNames([]);
           }
+          if (data.customLogo) setLogoDetails(data.customLogo);
           setIsEditMode(true);
         } else {
           // No data found - reset to default values
@@ -300,6 +339,20 @@ export default function PointsSetting() {
       isMounted = false;
     };
   }, [storeId, channelId, selectedChannel?.id, resetFormToDefaults]);
+
+  useEffect(() => {
+    if (!loading && initialSnapshot === null) {
+      setInitialSnapshot(currentSnapshot);
+    }
+  }, [loading, initialSnapshot, currentSnapshot]);
+
+  useEffect(() => {
+    console.log(
+      "Current form state changed:",
+      initialSnapshot,
+      currentSnapshot,
+    );
+  }, [initialSnapshot, currentSnapshot]);
 
   // Validation functions
   const validateForm = useCallback((): {
@@ -455,6 +508,7 @@ export default function PointsSetting() {
           src: URL.createObjectURL(file),
           name: file.name,
         });
+        setIsLocal(true);
         setSelectedLogo(null);
         // Clear logo validation error when custom logo is uploaded
         setValidationErrors((prev) => ({ ...prev, logo: undefined }));
@@ -596,7 +650,7 @@ export default function PointsSetting() {
             });
           }
         }
-        return;
+        throw new Error(errorMessage);
       }
 
       if (!currentStoreId || !currentChannelId) {
@@ -607,7 +661,9 @@ export default function PointsSetting() {
         alert(
           `Store ID and Channel ID are required. Please select a channel.\nStore ID: ${currentStoreId || "missing"}\nChannel ID: ${currentChannelId || "missing"}`,
         );
-        return;
+        throw new Error(
+          "Store ID and Channel ID are required. Please select a channel.",
+        );
       }
 
       try {
@@ -701,6 +757,7 @@ export default function PointsSetting() {
         // Reset tier editing state after successful save
         setResetTierEditing(true);
         setTimeout(() => setResetTierEditing(false), 100);
+        setInitialSnapshot(currentSnapshot);
 
         // Stop loading first, then show success toast
         setLoadingState(false);
@@ -715,6 +772,7 @@ export default function PointsSetting() {
         setLoadingState(false);
         alert(error.message || "Failed to save points");
         console.error("Error saving points:", error);
+        throw error;
       }
     },
     [
@@ -748,6 +806,23 @@ export default function PointsSetting() {
     // Navigate to next step: Ways to Earn (using router to preserve Redux state)
     router.push("/setup/ways-to-earn");
   }, [performSave, router]);
+
+  const unsavedGuard = useUnsavedChangesGuard({
+    hasUnsavedChanges,
+    onSave: async () => {
+      await handleSave();
+    },
+  });
+
+  const navigateHandlerRef = useRef(unsavedGuard.safeNavigate);
+  navigateHandlerRef.current = unsavedGuard.safeNavigate;
+
+  useEffect(() => {
+    exposeNavigate?.(() => (route: string) => {
+      navigateHandlerRef.current(route);
+    });
+    return () => exposeNavigate?.(undefined);
+  }, [exposeNavigate]);
 
   // Show message if no channel is selected
   if (!selectedChannel) {
@@ -943,6 +1018,17 @@ export default function PointsSetting() {
                     logoDetails &&
                     !logos.includes(logoDetails.name) &&
                     selectedLogo === null;
+
+                  const pointLogoUrl =
+                    logoDetails &&
+                    (logoDetails.src.startsWith("http") ||
+                    logoDetails.src.startsWith("data:")
+                      ? logoDetails.src
+                      : /^point-icon\d\.svg$/i.test(logoDetails.src)
+                        ? `${process.env.NEXT_PUBLIC_BASE_PATH || ""}/images/${logoDetails.src}`
+                        : isLocal
+                          ? logoDetails.src
+                          : `${process.env.NEXT_PUBLIC_BACKEND_URL || ""}${logoDetails.src.startsWith("/") ? "" : "/"}${logoDetails.src}`);
                   // Show if user uploaded a custom logo OR if there's a custom logo from database
                   return (customLogo || isCustomLogoFromDB) && logoDetails ? (
                     <button
@@ -954,7 +1040,7 @@ export default function PointsSetting() {
                       title="Click to change custom logo"
                     >
                       <img
-                        src={logoDetails.src}
+                        src={pointLogoUrl || ""}
                         alt="Custom Logo"
                         width={25}
                         height={25}
@@ -1133,7 +1219,9 @@ export default function PointsSetting() {
         <Button
           color="primary"
           variant="flat"
-          onPress={handleSave}
+          onPress={() => {
+            void handleSave().catch(() => {});
+          }}
           isLoading={saveLoading}
           className="custom-btn-default"
         >
@@ -1141,7 +1229,9 @@ export default function PointsSetting() {
         </Button>
         <Button
           className="custom-btn"
-          onPress={handleSaveAndNext}
+          onPress={() => {
+            void handleSaveAndNext().catch(() => {});
+          }}
           isLoading={saveAndNextLoading}
         >
           Save & Next
@@ -1153,6 +1243,13 @@ export default function PointsSetting() {
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         featureName={restrictedFeatureName}
+      />
+
+      <UnsavedChangesModal
+        isOpen={unsavedGuard.showUnsavedModal}
+        onSave={unsavedGuard.handleSaveUnsavedChanges}
+        onDiscard={unsavedGuard.handleDiscardUnsavedChanges}
+        isLoading={saveLoading || saveAndNextLoading}
       />
     </>
   );

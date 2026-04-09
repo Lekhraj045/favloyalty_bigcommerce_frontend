@@ -68,17 +68,17 @@ export const createEventFromForm = (formData: EventFormData): Event | null => {
     return null;
   }
 
-  // Convert DateValue to Date
-  const eventDateObj = new Date(
-    formData.date.year,
-    formData.date.month - 1,
-    formData.date.day,
-  );
+  // Keep event date as a pure calendar date string to avoid timezone shifts
+  const eventDateYmd = `${formData.date.year}-${String(formData.date.month).padStart(2, "0")}-${String(formData.date.day).padStart(2, "0")}`;
 
   // Check if event date is today (for isImmediate)
   const todayDate = new Date();
   todayDate.setHours(0, 0, 0, 0);
-  const selectedDate = new Date(eventDateObj);
+  const selectedDate = new Date(
+    formData.date.year,
+    formData.date.month - 1,
+    formData.date.day,
+  );
   selectedDate.setHours(0, 0, 0, 0);
   const isImmediate = selectedDate.getTime() === todayDate.getTime();
 
@@ -86,7 +86,7 @@ export const createEventFromForm = (formData: EventFormData): Event | null => {
   return {
     name: trimmedEventName,
     type: "default",
-    eventDate: eventDateObj.toISOString(),
+    eventDate: eventDateYmd,
     point: pointsValue,
     status: "scheduled",
     processingInfo: {
@@ -103,7 +103,10 @@ export const createEventFromForm = (formData: EventFormData): Event | null => {
 };
 
 export const convertEventToFormData = (event: Event): EventFormData => {
-  const date = new Date(event.eventDate);
+  const raw = String(event.eventDate || "");
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+    ? new Date(`${raw}T00:00:00`)
+    : new Date(raw);
   // Create a proper CalendarDate object for the DatePicker
   const calendarDate = new CalendarDate(
     date.getFullYear(),

@@ -4,6 +4,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Event, EventFormData } from "./types";
 
+const BROWSER_BACK_ROUTE = "__BROWSER_BACK__";
+
 /**
  * Hook for managing ways to earn settings
  */
@@ -51,8 +53,8 @@ export function useWaysToEarnSettings() {
   const [recallDays, setRecallDays] = useState("0");
   const [rejoinPoints, setRejoinPoints] = useState("0");
 
-  // Loading state
-  const [loading, setLoading] = useState(false);
+  // Loading state — start true so baseline/dirty logic never snapshots default form before first fetch
+  const [loading, setLoading] = useState(true);
 
   // Reset form to default values
   const resetToDefaults = () => {
@@ -78,13 +80,15 @@ export function useWaysToEarnSettings() {
 
   // Load collect settings when page loads or channel changes
   useEffect(() => {
-    const loadCollectSettings = async () => {
-      if (!storeId || !channelId) {
-        resetToDefaults();
-        return;
-      }
+    if (!storeId || !channelId) {
+      resetToDefaults();
+      setLoading(false);
+      return;
+    }
 
-      setLoading(true);
+    setLoading(true);
+
+    const loadCollectSettings = async () => {
       try {
         const data = await getCollectSettings(storeId, channelId);
 
@@ -178,7 +182,7 @@ export function useWaysToEarnSettings() {
       }
     };
 
-    loadCollectSettings();
+    void loadCollectSettings();
   }, [storeId, channelId, selectedChannel?.id]);
 
   return {
@@ -251,7 +255,13 @@ export function useUnsavedChanges(
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
     null,
   );
+  const pendingNavigationRef = useRef<string | null>(null);
   const isNavigatingRef = useRef(false);
+
+  const setPendingRoute = (route: string | null) => {
+    pendingNavigationRef.current = route;
+    setPendingNavigation(route);
+  };
 
   // Check if events have changed
   useEffect(() => {
@@ -262,32 +272,20 @@ export function useUnsavedChanges(
 
   // Handle page refresh/unload and browser navigation
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-        e.returnValue =
-          "You have unsaved changes. Are you sure you want to leave?";
-        return e.returnValue;
-      }
-    };
+    if (!hasUnsavedChanges) return;
 
     const handlePopState = (e: PopStateEvent) => {
       if (hasUnsavedChanges && !isNavigatingRef.current) {
         // Prevent navigation and show modal
         window.history.pushState(null, "", window.location.href);
-        setPendingNavigation(pathname);
+        setPendingRoute(BROWSER_BACK_ROUTE);
         setShowUnsavedModal(true);
       }
     };
 
-    // Push current state to enable popstate detection
-    window.history.pushState(null, "", window.location.href);
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("popstate", handlePopState);
 
     return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("popstate", handlePopState);
     };
   }, [hasUnsavedChanges, pathname]);
@@ -295,7 +293,7 @@ export function useUnsavedChanges(
   // Custom navigation function that checks for unsaved changes
   const safeNavigate = (route: string) => {
     if (hasUnsavedChanges && !isNavigatingRef.current) {
-      setPendingNavigation(route);
+      setPendingRoute(route);
       setShowUnsavedModal(true);
     } else {
       isNavigatingRef.current = false;
@@ -303,27 +301,34 @@ export function useUnsavedChanges(
     }
   };
 
+  const navigateToPendingRoute = (route: string | null) => {
+    if (!route) return;
+    if (route === BROWSER_BACK_ROUTE) {
+      window.history.back();
+      return;
+    }
+    if (route !== pathname) {
+      router.push(route);
+    }
+  };
+
   // Handle unsaved changes - Save
   const handleSaveUnsavedChanges = async () => {
-    setShowUnsavedModal(false);
-    const navRoute = pendingNavigation;
-    setPendingNavigation(null);
+    const navRoute = pendingNavigationRef.current ?? pendingNavigation;
     isNavigatingRef.current = true;
 
     try {
       await onSave();
-
-      // Navigate after successful save
-      if (navRoute && navRoute !== pathname) {
-        router.push(navRoute);
-      }
-      // Reset after a short delay to allow navigation
+      setShowUnsavedModal(false);
+      setPendingRoute(null);
+      navigateToPendingRoute(navRoute);
       setTimeout(() => {
         isNavigatingRef.current = false;
       }, 100);
-    } catch (error) {
-      // If save fails, don't navigate
+    } catch {
       isNavigatingRef.current = false;
+      setShowUnsavedModal(false);
+      setPendingRoute(null);
     }
   };
 
@@ -333,15 +338,13 @@ export function useUnsavedChanges(
       onDiscard();
     }
     setHasUnsavedChanges(false);
-    const navRoute = pendingNavigation;
-    setPendingNavigation(null);
+    const navRoute = pendingNavigationRef.current ?? pendingNavigation;
+    setPendingRoute(null);
     setShowUnsavedModal(false);
     isNavigatingRef.current = true;
 
     // Navigate after discarding
-    if (navRoute && navRoute !== pathname) {
-      router.push(navRoute);
-    }
+    navigateToPendingRoute(navRoute);
     // Reset after a short delay to allow navigation
     setTimeout(() => {
       isNavigatingRef.current = false;

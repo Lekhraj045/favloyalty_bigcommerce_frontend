@@ -7,12 +7,15 @@ import {
   updateChannelWidgetVisibility,
 } from "@/store/slices/channelSlice";
 import {
+  getStorePlan,
   resetChannelSettingsApi,
+  StorePlan,
   updateWidgetVisibilityApi,
 } from "@/utils/api";
 import { Button } from "@heroui/button";
 import { addToast } from "@heroui/toast";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import DashLayout from "./components/dash-layout";
@@ -33,6 +36,30 @@ export default function DashboardPage() {
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [storePlan, setStorePlan] = useState<StorePlan | null>(null);
+  const router = useRouter();
+
+  // Load store plan information
+  useEffect(() => {
+    const loadStorePlan = async () => {
+      try {
+        const plan = await getStorePlan();
+        setStorePlan(plan);
+      } catch (error) {
+        console.error("Error loading store plan:", error);
+        // Default to free plan if error
+        setStorePlan({
+          plan: "free",
+          trialDaysRemaining: null,
+          paypalSubscriptionId: null,
+          limitReached: false,
+          orderCount: 0,
+          selectedOrderLimit: 0,
+        });
+      }
+    };
+    loadStorePlan();
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -147,9 +174,9 @@ export default function DashboardPage() {
       <div className="max-w-5xl mx-auto">
         <div className="flex flex-col gap-4">
           <div className="flex gap-2 justify-between items-center">
-            <h1 className="text-xl font-bold">Dashboard</h1>
+            <div className="flex flex-col">
+              <h1 className="text-xl font-bold">Dashboard</h1>
 
-            <div className="flex gap-2.5 items-center">
               <div
                 className={`relative pl-6 ${effectiveWidgetEnabled ? "online-widget" : "offline-widget"}`}
               >
@@ -159,6 +186,8 @@ export default function DashboardPage() {
                     : "Loyalty program not active"}
                 </p>
               </div>
+            </div>
+            <div className="flex gap-2.5 items-center">
               <ChannelSelector />
               <Button
                 className="custom-btn"
@@ -177,6 +206,28 @@ export default function DashboardPage() {
               >
                 Reset Settings
               </Button>
+              {/* Only show Upgrade button for free plan users or when limit reached */}
+              {storePlan?.plan === "free" || storePlan?.limitReached ? (
+                <Button
+                  onClick={() => {
+                    router.push("/pricing");
+                  }}
+                  className="custom-btn"
+                >
+                  Upgrade
+                </Button>
+              ) : storePlan?.plan === "paid" ? (
+                <div className="custom-btn-default bg-amber-50 opacity-90">
+                  Pro{" "}
+                  <span className="ml-1 text-xs bg-green-200 text-green-800 px-1.5 py-0.5 rounded-full">
+                    Active
+                  </span>
+                </div>
+              ) : (
+                <Button disabled className="custom-btn-default opacity-50">
+                  Loading...
+                </Button>
+              )}
             </div>
           </div>
 

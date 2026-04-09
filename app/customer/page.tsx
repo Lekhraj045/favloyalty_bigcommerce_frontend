@@ -46,12 +46,25 @@ export default function CustomersPage() {
             <div className="flex gap-2.5 items-center">
               <ChannelSelector />
               {/* Only show Upgrade button for free plan users or when limit reached */}
-              {(storePlan?.plan === "free" || storePlan?.limitReached) && (
+              {storePlan?.plan === "free" || storePlan?.limitReached ? (
                 <Button
-                  onClick={() => router.push("/pricing")}
+                  onClick={() => {
+                    router.push("/pricing");
+                  }}
                   className="custom-btn"
                 >
                   Upgrade
+                </Button>
+              ) : storePlan?.plan === "paid" ? (
+                <div className="custom-btn-default bg-amber-50 opacity-90">
+                  Pro{" "}
+                  <span className="ml-1 text-xs bg-green-200 text-green-800 px-1.5 py-0.5 rounded-full">
+                    Active
+                  </span>
+                </div>
+              ) : (
+                <Button disabled className="custom-btn-default opacity-50">
+                  Loading...
                 </Button>
               )}
             </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import SetupHeader from "@/components/SetupHeader";
-import SetupNavigation from "@/components/SetupNavigation";
 import { Alert } from "@heroui/alert";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -32,7 +31,7 @@ function HomeContent() {
         <div className="flex flex-col gap-4">
           <div className="head">
             <SetupHeader />
-            <SetupNavigation />
+            {/* <SetupNavigation /> */}
           </div>
 
           {showSuccessMessage && (

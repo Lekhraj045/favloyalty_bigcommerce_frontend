@@ -2,7 +2,9 @@
 
 import SetupHeader from "@/components/SetupHeader";
 import SetupNavigation from "@/components/SetupNavigation";
+import UnsavedChangesModal from "@/components/UnsavedChangesModal";
 import UpgradeModal from "@/components/UpgradeModal";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { useAppDispatch } from "@/store/hooks";
 import { updateChannelCompletionStatus } from "@/store/slices/channelSlice";
 import {
@@ -415,6 +417,7 @@ export default function WaysToRedeem() {
         description: error.message || "Failed to save coupon settings",
         color: "danger",
       });
+      throw error;
     } finally {
       // Only reset loading if not navigating (isNext = false)
       if (!isNext) {
@@ -422,6 +425,16 @@ export default function WaysToRedeem() {
       }
     }
   };
+
+  const unsavedGuard = useUnsavedChangesGuard({
+    hasUnsavedChanges,
+    onSave: async () => {
+      await handleSave(false);
+    },
+    // onDiscard: () => {
+    //   resetToOriginal();
+    // },
+  });
 
   // Show skeleton loading state
   if (loading) {
@@ -433,7 +446,7 @@ export default function WaysToRedeem() {
       <div className="flex flex-col gap-4">
         <div className="head">
           <SetupHeader hideChannelSelector={selectedForm !== null} />
-          <SetupNavigation />
+          <SetupNavigation onNavigate={unsavedGuard.safeNavigate} />
         </div>
 
         {selectedForm === "percentage-discount" ? (
@@ -561,7 +574,9 @@ export default function WaysToRedeem() {
                 color="primary"
                 variant="flat"
                 className="custom-btn-default"
-                onClick={() => handleSave(false)}
+                onClick={() => {
+                  void handleSave(false).catch(() => {});
+                }}
                 isLoading={saveLoading}
                 disabled={saveLoading || saveAndNextLoading}
               >
@@ -569,7 +584,9 @@ export default function WaysToRedeem() {
               </Button>
               <Button
                 className="custom-btn"
-                onClick={() => handleSave(true)}
+                onClick={() => {
+                  void handleSave(true).catch(() => {});
+                }}
                 isLoading={saveAndNextLoading}
                 disabled={saveLoading || saveAndNextLoading}
               >
@@ -603,6 +620,13 @@ export default function WaysToRedeem() {
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         featureName={restrictedFeatureName}
+      />
+
+      <UnsavedChangesModal
+        isOpen={unsavedGuard.showUnsavedModal}
+        onSave={unsavedGuard.handleSaveUnsavedChanges}
+        onDiscard={unsavedGuard.handleDiscardUnsavedChanges}
+        isLoading={saveLoading || saveAndNextLoading}
       />
     </div>
   );

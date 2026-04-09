@@ -8,6 +8,7 @@ import {
 } from "@/store/slices/channelSlice";
 import { getStoreId } from "@/utils/api";
 import { Select, SelectItem } from "@heroui/select";
+import { ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 export default function ChannelSelector() {
@@ -73,9 +74,7 @@ export default function ChannelSelector() {
   // to avoid hydration mismatches with the Select component.
   if (!mounted) {
     return (
-      <div className="text-sm text-gray-500 px-3 py-2">
-        Loading channels…
-      </div>
+      <div className="text-sm text-gray-500 px-3 py-2">Loading channels…</div>
     );
   }
 
@@ -98,29 +97,43 @@ export default function ChannelSelector() {
     mounted && selectedChannel?.id ? [selectedChannel.id] : [];
 
   return (
-    <Select
-      selectedKeys={effectiveSelectedKeys}
-      onSelectionChange={(keys) => {
-        const selectedKey = Array.from(keys)[0] as string;
-        if (selectedKey) {
-          handleChannelChange(selectedKey);
-        }
-      }}
-      placeholder="Select Channel"
-      isLoading={loading}
-      size="sm"
-      className="w-[140px] max-w-[140px]"
-      classNames={{
-        trigger: "bg-white border border-gray-300",
-        value: "truncate",
-      }}
-      aria-label="Select Channel"
-    >
-      {channels.map((channel) => (
-        <SelectItem key={channel.id || ""}>
-          {channel.channel_name || `Channel ${channel.channel_id}`}
-        </SelectItem>
-      ))}
-    </Select>
+    <div className="relative w-[140px] max-w-[10px] min-w-[140px]">
+      <div className="absolute top-[-8px] left-[4px] px-1.5 z-10 bg-white ">
+        <div className="flex items-center gap-1">
+          <span className="text-[11px]">Channel</span>
+          <a
+            href={selectedChannel?.site_url || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
+      </div>
+      <Select
+        selectedKeys={effectiveSelectedKeys}
+        onSelectionChange={(keys) => {
+          const selectedKey = Array.from(keys)[0] as string;
+          if (selectedKey) {
+            handleChannelChange(selectedKey);
+          }
+        }}
+        placeholder="Select Channel"
+        isLoading={loading}
+        size="sm"
+        className="w-full"
+        classNames={{
+          trigger: "bg-white border border-gray-300",
+          value: "truncate",
+        }}
+        aria-label="Select Channel"
+      >
+        {channels.map((channel) => (
+          <SelectItem key={channel.id || ""}>
+            {channel.channel_name || `Channel ${channel.channel_id}`}
+          </SelectItem>
+        ))}
+      </Select>
+    </div>
   );
 }
