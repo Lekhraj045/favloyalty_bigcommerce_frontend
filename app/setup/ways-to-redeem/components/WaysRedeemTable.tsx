@@ -233,7 +233,7 @@ export default function WaysRedeemTable({
     getCouponRowKey(coupon, index),
   );
 
-  const selectedSet = useMemo(() => {
+  const selectedSet = useMemo((): Set<string> => {
     if (!isSelectionControlled) return localSelectedKeys;
 
     const anyKeys = selectedKeys as any;

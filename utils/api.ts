@@ -262,6 +262,7 @@ export type Channel = {
   customiseWidgetCompleted?: boolean;
   widget_visibility?: boolean;
   default_currency?: string | null; // Channel currency (e.g. INR, USD) for "per X spent" label
+  site_url?: string | null; // Channel site URL (e.g. https://store.com)
 };
 
 export type LoginResponse = {
