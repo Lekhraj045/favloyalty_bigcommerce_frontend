@@ -6,6 +6,7 @@ import {
   Cog6ToothIcon,
   CreditCardIcon,
   EnvelopeIcon,
+  LifebuoyIcon,
   UsersIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -53,6 +54,11 @@ export const Navbar = () => {
       label: "Email",
       icon: <EnvelopeIcon className="w-5 h-5" />,
       href: "/email",
+    },
+    {
+      label: "Support",
+      icon: <LifebuoyIcon className="w-5 h-5" />,
+      href: "/support",
     },
     {
       label: "Plan & Pricing",
