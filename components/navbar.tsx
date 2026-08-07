@@ -81,7 +81,7 @@ export const Navbar = () => {
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               {!isCollapsed && (
-                <NextLink href="/" className="flex items-center">
+                <NextLink href="/setup/points-tier-system" className="flex items-center">
                   <Image
                     src={`${process.env.NEXT_PUBLIC_BASE_PATH}/images/favloyalty-logo.svg`}
                     alt="FavLoyalty"
