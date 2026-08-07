@@ -928,16 +928,20 @@ export default function PricingPlanArea({
                       Current Plan
                     </Button>
                   ) : (
+
                     <Button
                       className="custom-btn w-full"
                       onClick={handleSimpleUpgrade}
                       isLoading={isProcessing}
-                      isDisabled={isProcessing || loadingPlan}
+                      isDisabled={true || isProcessing || loadingPlan}
                     >
-                      {isProcessing
+                      {/* {isProcessing
                         ? "Processing..."
-                        : `Upgrade to Pro ($${price.toFixed(2)}/month)`}
+                        : `Upgrade to Pro ($${price.toFixed(2)}/month)`} */}
+
+                        Upgrade to Pro will be available soon
                     </Button>
+                    
                   )}
                   {error && (
                     <p className="text-xs text-red-500 mt-2 text-center">
