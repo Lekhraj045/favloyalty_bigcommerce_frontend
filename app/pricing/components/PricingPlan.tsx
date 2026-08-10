@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  capturePayPalPayment,
-  createPayPalOrder,
+  capturePayPalSubscription,
+  createPayPalSubscription,
   downgradeToFree,
   getStorePlan,
   type StorePlan,
@@ -50,9 +50,11 @@ export default function PricingPlanArea({
   const [loadingPlan, setLoadingPlan] = useState(true);
   const [showDowngradeWarning, setShowDowngradeWarning] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [orderId, setOrderId] = useState<string | null>(null);
 
   const router = useRouter();
+  const paypalClientId =
+    process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ||
+    "AaNA_352JsMdxnfzmVrvDMXwDfEr0EPlVGkk_FxyvX-tZ6ZDnIpKDzQQ9smH1O9Gqpkv1yUu2g_6HKWZ";
 
   // Get user, channel, and store IDs from localStorage
   const getIds = () => {
@@ -120,11 +122,10 @@ export default function PricingPlanArea({
     fetchData();
   }, []);
 
-  // Load PayPal SDK with card payment enabled
+  // Load PayPal SDK for subscriptions
   useEffect(() => {
     const script = document.createElement("script");
-    script.src =
-      "https://www.paypal.com/sdk/js?client-id=AagcMVVm2eycujYYJedbPpcq_-RDwkpimw-83siOBJKP8ziCy0xBkF2Jb43p6QV_MiLglDRz_hmB_Br6&currency=USD&enable-funding=card";
+    script.src = `https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=USD&vault=true&intent=subscription&enable-funding=card`;
     script.async = true;
     script.onload = () => {
       setPaypalLoaded(true);
@@ -132,7 +133,6 @@ export default function PricingPlanArea({
     document.body.appendChild(script);
 
     return () => {
-      // Cleanup script on unmount
       const existingScript = document.querySelector(
         'script[src*="paypal.com/sdk"]',
       );
@@ -140,12 +140,11 @@ export default function PricingPlanArea({
         document.body.removeChild(existingScript);
       }
     };
-  }, []);
+  }, [paypalClientId]);
 
-  // Auto-render PayPal buttons when modal opens
+  // Auto-render PayPal subscription buttons when modal opens
   useEffect(() => {
-    if (showPaymentModal && orderId && paypalLoaded && window.paypal) {
-      // Small delay to ensure DOM is ready
+    if (showPaymentModal && paypalLoaded && window.paypal) {
       const timer = setTimeout(() => {
         const paypalContainer = document.getElementById(
           "paypal-payment-container",
@@ -157,7 +156,7 @@ export default function PricingPlanArea({
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [showPaymentModal, orderId, paypalLoaded]);
+  }, [showPaymentModal, paypalLoaded]);
 
   const handleDowngradeClick = () => {
     setShowDowngradeWarning(true);
@@ -211,36 +210,13 @@ export default function PricingPlanArea({
     setShowDowngradeWarning(false);
   };
 
-  const handleSimpleUpgrade = async () => {
-    // Show payment modal instead of directly processing
+  const handleSimpleUpgrade = () => {
     setShowPaymentModal(true);
     setError(null);
     setSuccess(null);
-
-    // Create order when modal opens
-    try {
-      const { userId, channelId, storeId } = getIds();
-      const orderResponse = await createPayPalOrder(
-        price.toFixed(2),
-        "USD",
-        userId || undefined,
-        channelId ? String(channelId) : undefined,
-        storeId || undefined,
-      );
-      setOrderId(orderResponse.id);
-    } catch (err: any) {
-      setError(err.message || "Failed to create order");
-      setShowPaymentModal(false);
-    }
   };
 
   const handlePayWithPayPal = async () => {
-    if (!orderId) {
-      setError("Order not created. Please try again.");
-      setPaypalButtonsRendering(false);
-      return;
-    }
-
     if (!paypalLoaded || !window.paypal) {
       setError(
         "PayPal SDK is still loading. Please wait a moment and try again.",
@@ -252,7 +228,6 @@ export default function PricingPlanArea({
     setError(null);
 
     try {
-      // Render PayPal buttons in the modal
       const paypalContainer = document.getElementById(
         "paypal-payment-container",
       );
@@ -266,33 +241,42 @@ export default function PricingPlanArea({
             shape: "rect",
             label: "paypal",
           },
-          createOrder: async () => {
-            return orderId;
+          createSubscription: async () => {
+            const { userId, channelId, storeId } = getIds();
+            const subscription = await createPayPalSubscription(
+              price.toFixed(2),
+              "USD",
+              storeId || undefined,
+              planId || undefined,
+              orderCount,
+              userId || undefined,
+              channelId ? String(channelId) : undefined,
+            );
+            return subscription.id;
           },
           onApprove: async (data: any) => {
             try {
               setIsProcessing(true);
               const { userId, channelId, storeId } = getIds();
 
-              const captureResponse = await capturePayPalPayment(
-                data.orderID,
+              const captureResponse = await capturePayPalSubscription(
+                data.subscriptionID,
                 storeId || undefined,
                 planId || undefined,
                 orderCount,
                 "EVERY_30_DAYS",
+                price.toFixed(2),
               );
 
               setSuccess(
-                `Payment successful! Amount: $${captureResponse.amount}`,
+                `Subscription started! $${captureResponse.amount || price.toFixed(2)}/month`,
               );
               setIsProcessing(false);
               setShowPaymentModal(false);
 
-              // Refresh store plan
               try {
                 const updatedPlan = await getStorePlan();
                 setStorePlan(updatedPlan);
-                // Notify parent component to refresh its store plan state
                 if (onPlanChange) {
                   onPlanChange();
                 }
@@ -300,7 +284,6 @@ export default function PricingPlanArea({
                 console.error("Error refreshing store plan:", err);
               }
 
-              // Redirect after success
               const params = new URLSearchParams();
               if (userId) params.append("userId", userId);
               if (channelId) params.append("channelId", String(channelId));
@@ -311,25 +294,23 @@ export default function PricingPlanArea({
                 router.push(`pricing?${params.toString()}`);
               }, 2000);
             } catch (err: any) {
-              setError(err.message || "Failed to capture payment");
+              setError(err.message || "Failed to activate subscription");
               setIsProcessing(false);
             }
           },
           onError: (err: any) => {
-            setError(err.message || "An error occurred during payment");
+            setError(err.message || "An error occurred during subscription");
             setIsProcessing(false);
           },
           onCancel: () => {
-            setError("Payment was cancelled");
+            setError("Subscription was cancelled");
             setIsProcessing(false);
           },
         });
 
-        // Render buttons and track when they're loaded
         buttons
           .render("#paypal-payment-container")
           .then(() => {
-            // Buttons are now rendered
             setPaypalButtonsRendering(false);
           })
           .catch((err: any) => {
@@ -339,7 +320,7 @@ export default function PricingPlanArea({
       }
     } catch (err: any) {
       setPaypalButtonsRendering(false);
-      setError(err.message || "Failed to initialize PayPal payment");
+      setError(err.message || "Failed to initialize PayPal subscription");
       setIsProcessing(false);
     }
   };
@@ -379,7 +360,6 @@ export default function PricingPlanArea({
             return;
           }
           setShowPaymentModal(false);
-          setOrderId(null);
           setError(null);
           setPaypalButtonsRendering(false);
           // Clear PayPal container
@@ -544,20 +524,18 @@ export default function PricingPlanArea({
                           id="paypal-payment-container"
                           className="min-h-[200px] flex items-center justify-center relative"
                         >
-                          {(paypalButtonsRendering ||
-                            !paypalLoaded ||
-                            !orderId) && (
+                          {(paypalButtonsRendering || !paypalLoaded) && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center bg-white rounded-lg border border-gray-200">
                               <div className="flex flex-col items-center gap-3">
                                 <div className="relative w-12 h-12">
                                   <div className="absolute inset-0 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
                                 </div>
                                 <p className="text-sm text-gray-600 font-medium">
-                                  Loading payment options...
+                                  Loading subscription options...
                                 </p>
                                 <p className="text-xs text-gray-500">
                                   Please wait while we set up your secure
-                                  payment
+                                  subscription
                                 </p>
                               </div>
                             </div>
@@ -933,13 +911,11 @@ export default function PricingPlanArea({
                       className="custom-btn w-full"
                       onClick={handleSimpleUpgrade}
                       isLoading={isProcessing}
-                      isDisabled={true || isProcessing || loadingPlan}
+                      isDisabled={isProcessing || loadingPlan}
                     >
-                      {/* {isProcessing
+                      {isProcessing
                         ? "Processing..."
-                        : `Upgrade to Pro ($${price.toFixed(2)}/month)`} */}
-
-                        Upgrade to Pro will be available soon
+                        : `Upgrade to Pro ($${price.toFixed(2)}/month)`}
                     </Button>
                     
                   )}

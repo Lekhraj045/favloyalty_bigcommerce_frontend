@@ -2332,6 +2332,138 @@ export async function createPayPalOrder(
   return result;
 }
 
+export interface CreateSubscriptionResponse {
+  id: string;
+  status?: string;
+  paypalPlanId?: string;
+  amount?: string;
+  currency?: string;
+  selectedOrderLimit?: number;
+  trialDays?: number;
+}
+
+export interface CaptureSubscriptionResponse {
+  success: boolean;
+  subscriptionID: string;
+  status?: string;
+  amount?: string;
+  subscription?: {
+    id: string;
+    status: string;
+    planId: string;
+    storeId: string;
+    nextBillingDate: string;
+    trialEndsAt: string | null;
+    paypalSubscriptionId?: string;
+  } | null;
+}
+
+/**
+ * Create a PayPal recurring subscription (dynamic monthly price)
+ */
+export async function createPayPalSubscription(
+  value: string,
+  currency: string = "USD",
+  storeId?: string,
+  planId?: string,
+  selectedOrderLimit?: number,
+  userId?: string,
+  channelId?: string,
+): Promise<CreateSubscriptionResponse> {
+  console.log("📥 Creating PayPal subscription:", {
+    value,
+    currency,
+    storeId,
+    planId,
+    selectedOrderLimit,
+  });
+
+  const response = await fetchWithAuth(
+    `${API_URL}/api/payment/create-subscription`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        price: value,
+        value,
+        currency,
+        storeId,
+        planId,
+        selectedOrderLimit,
+        userId,
+        channelId,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error creating PayPal subscription:", errorBody);
+    throw new Error(
+      errorBody.message ||
+        errorBody.error ||
+        "Failed to create PayPal subscription",
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ PayPal subscription created successfully:", result);
+  return result;
+}
+
+/**
+ * Activate a PayPal subscription after buyer approval
+ */
+export async function capturePayPalSubscription(
+  subscriptionID: string,
+  storeId?: string,
+  planId?: string,
+  selectedOrderLimit?: number,
+  billingInterval?: string,
+  amount?: string,
+): Promise<CaptureSubscriptionResponse> {
+  console.log("📥 Capturing PayPal subscription:", {
+    subscriptionID,
+    storeId,
+    planId,
+    selectedOrderLimit,
+  });
+
+  const response = await fetchWithAuth(
+    `${API_URL}/api/payment/capture-subscription`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        subscriptionID,
+        storeId,
+        planId,
+        selectedOrderLimit,
+        billingInterval,
+        amount,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.error("❌ Error capturing PayPal subscription:", errorBody);
+    throw new Error(
+      errorBody.message ||
+        errorBody.error ||
+        "Failed to activate PayPal subscription",
+    );
+  }
+
+  const result = await response.json();
+  console.log("✅ PayPal subscription activated successfully:", result);
+  return result;
+}
+
 /**
  * Capture a PayPal payment
  */
