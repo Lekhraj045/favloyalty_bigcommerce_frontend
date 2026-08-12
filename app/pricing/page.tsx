@@ -18,6 +18,11 @@ export default function PricingPage() {
   const fetchStorePlan = useCallback(async () => {
     try {
       const planData = await getStorePlan();
+      setOrderValue(
+        planData.plan === "free"
+          ? Math.max(750, planData.selectedOrderLimit || 750) 
+          : planData.selectedOrderLimit
+      );
       setStorePlan(planData);
     } catch (err) {
       console.error("Error fetching store plan:", err);

@@ -860,8 +860,7 @@ export default function PricingPlanArea({
                       <p className="text-xs text-yellow-700">
                         You've used {storePlan.orderCount?.toLocaleString()} of{" "}
                         {storePlan.selectedOrderLimit?.toLocaleString()} orders.
-                        Premium features are restricted. Upgrade to increase
-                        your limit.
+                        Premium features are restricted. Resumes on next billing cycle.
                       </p>
                     </div>
                   </div>
@@ -911,12 +910,12 @@ export default function PricingPlanArea({
                       className="custom-btn w-full"
                       onClick={handleSimpleUpgrade}
                       isLoading={isProcessing}
-                      isDisabled={true || isProcessing || loadingPlan}
+                      isDisabled={isProcessing || loadingPlan}
                     >
-                      {/* {isProcessing
+                      {isProcessing
                         ? "Processing..."
-                        : `Upgrade to Pro ($${price.toFixed(2)}/month)`} */}
-                        Upgrade to Pro will be available soon.
+                        : `Upgrade to Pro ($${price.toFixed(2)}/month)`}
+                        {/* Upgrade to Pro will be available soon. */}
                     </Button>
                     
                   )}
